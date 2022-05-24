@@ -1,0 +1,2 @@
+openssl req -x509 -newkey rsa:2048 -nodes -keyout hub.key -out hub.pem -sha256 -days 3650 -config <(echo -e "[req]\ndistinguished_name=req") -subj '/CN=hub.api.surehub.io' -addext "subjectAltName=DNS:hub.api.surehub.io"
+chmod 666 hub.key hub.pem

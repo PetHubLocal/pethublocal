@@ -127,3 +127,12 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+.idea/
+
+# Exclude pethublocal config files and logs
+pethubconfig*
+start*.json
+pethublocal.log
+run/
+H0*.bin

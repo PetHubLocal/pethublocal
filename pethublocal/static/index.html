@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>Pet Hub Local</title>
+    <!--<link rel="icon" type="image/png" href="/icon.png" />-->
+<!--    <link rel="stylesheet" href="/main.css">-->
+
+    <!-- Load PetHubConfig -->
+    <script type="text/javascript" src="/pethubconfig"></script>
+
+    <!-- Socket IO -->
+<!--    <script src="https://cdn.socket.io/3.1.3/socket.io.min.js" integrity="sha384-cPwlPLvBTa3sKAgddT6krw0cJat7egBga3DJepJyrLl4Q9/5WLra3rrnMcyTyOnh" crossorigin="anonymous"></script>-->
+    <script type="text/javascript" src="/socket.io.min.js"></script>
+    <style>
+    table {
+        width: 100%;
+    }
+
+    tr:nth-child(odd) {
+        background-color: lightgrey;
+    }
+
+    th {
+        background-color: blue;
+        color: #fff;
+    }
+
+    th,
+    td {
+        text-align: left;
+        padding: 0.5em 1em;
+    }
+
+    h1 {
+        border: 2px grey solid;
+        color: darkblue;
+        text-align: center;
+        padding: 3px;
+    }
+    h2 {
+        color: light-blue;
+        text-align: center;
+        padding: 0px;
+    }
+    h3 {
+        color: light-blue;
+        text-align: center;
+        padding: 0px;
+    }
+
+    textarea {
+        font-family: "Lucida Console", "Courier New", monospace;
+        resize: vertical;
+        width: 100%;
+        max-width: 100%;
+    }
+
+    </style>
+
+</head>
+<body>
+    <h1>Pet Hub Local</h1>
+    <h2>Your local instance of the cloud for your SurePetCare Connect Hub and Devices</h2>
+    <center><h3>Devices</h3></center>
+    <hr style="height:3px;background-color:black;"/>
+    <table class="table" id="Devices">
+        <thead></thead>
+        <tbody></tbody>
+    </table>
+    <br/>
+
+<!--    <hr style="height:3px;background-color:black;"/>-->
+    <center><h3>Pets</h3></center>
+
+    <table class="table" id="Pets">
+        <thead>
+            <tr>
+                <th scope="col" width="150px">Tag</th>
+                <th scope="col" width="110px">Name</th>
+                <th scope="col" width="10px">Species</th>
+                <th scope="col">Where</th>
+                <th scope="col">Feed</th>
+                <th scope="col">Drink</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+
+    <div class="form-group">
+        <label class="control-label col-xs-4">Messages:</label>
+        <div class="col-xs-8">
+            <textarea id="web_message" rows=10></textarea>
+        </div>
+    </div>
+
+</body>
+<script>
+
+var socket = io.connect('http://' + document.domain + ':' + location.port);
+
+function emit_message(e) {
+  if (e.target) {
+    id = e.target.id.split('#');
+    var payload = {
+        "id": id[0],
+        [id[1]]: e.target.innerHTML
+    }
+    socket.emit("browser_message", JSON.stringify(payload));
+  }
+}
+
+document.addEventListener("DOMContentLoaded", function(event) {
+    console.log('Browser Ready');
+
+    // var mydata = JSON.parse(pet);
+    console.log('PetHubConfig: '+JSON.stringify(pethubconfig));
+
+    // Populate devices table
+    var device_columns = ['Index','Mac_Address','Product_Id','Serial_Number','State','Name','Commands']
+    for (var hub in pethubconfig.Devices) {
+        var table = document.getElementById("Devices").getElementsByTagName('thead')[0];
+
+        var device_row = table.insertRow();
+        var headerCell = document.createElement("TH");
+        headerCell.colSpan = device_columns.length;
+        headerCell.innerHTML = "<center><b>" + hub + "</b></center>";
+        device_row.appendChild(headerCell);
+
+        //Add the header row.
+        var row = table.insertRow();
+        for (var i = 0; i < device_columns.length; i++) {
+            var headerCell = document.createElement("TH");
+            headerCell.innerHTML = device_columns[i];
+            row.appendChild(headerCell);
+        }
+
+        var table = document.getElementById("Devices").getElementsByTagName('tbody')[0];
+        for (var device in pethubconfig.Devices[hub]){
+            var current_device = pethubconfig.Devices[hub][device];
+            var row = table.insertRow();
+            for (var i = 0; i < device_columns.length; i++) {
+                var row_cell = row.insertCell();
+                if ( device_columns[i] == 'Commands' ) {
+                    if ( current_device['Product_Id'] == 1 ) {
+                        let btn = document.createElement("button");
+                        btn.innerHTML = "Adopt";
+                        btn.type = "submit";
+                        btn.id = hub_dev+"#Adopt";
+                        btn.addEventListener('click', emit_message)
+                        row_cell.appendChild(btn);
+
+                        //row_cell.innerHTML = appendChild(btn);
+                        //row_cell.id = hub_dev+"#Adopt";
+                        //row_cell.addEventListener('input', emit_message)
+                    } else {
+                        row_cell.innerHTML = "No Commands";
+                    }
+                } else {
+                    row_cell.innerHTML = current_device[device_columns[i]];
+                }
+
+                // Allow Names to be changed
+                var hub_dev;
+                if (current_device.Product_Id == 1) {
+                    hub_dev = hub+"_Hub";
+                } else {
+                    hub_dev = hub+"_"+current_device['Mac_Address'];
+                }
+                if (device_columns[i] == 'Name') {
+                    row_cell.contentEditable = "true";
+                    row_cell.id = hub_dev+"#Name";
+                    row_cell.addEventListener('input', emit_message)
+                }
+                if (device_columns[i] == 'State') {
+                    row_cell.id = hub_dev+"#State";
+                }
+            }
+        }
+    }
+
+    // Populate pets table
+    var table = document.getElementById("Pets");
+    for (var tag in pethubconfig.Pets){
+        var pet = pethubconfig.Pets[tag];
+        var row = table.insertRow();
+
+        // Add Tag Value as first cell
+        var row_cell = row.insertCell();
+        row_cell.innerHTML = tag;
+
+        // Table columns
+        var row_values = ['Name','Species','Activity','Feeding','Drinking'];
+        // Columns with data that needs to be parsed
+        var cell_subvalues = ['Activity','Feeding','Drinking'];
+
+        for (var i = 0; i < row_values.length; i++) {
+            var row_cell = row.insertCell();
+            if (pet.hasOwnProperty(row_values[i])) {
+                if (cell_subvalues.includes(row_values[i])) {
+                    row_cell.innerHTML = JSON.stringify(pet[row_values[i]]);
+                } else {
+                    row_cell.innerHTML = pet[row_values[i]];
+                }
+                // Allow Names to be changed
+                if (row_values[i] == 'name') {
+                    row_cell.contentEditable = "true";
+
+                }
+                if (row_values[i] == 'Name') {
+                    row_cell.contentEditable = "true";
+                    row_cell.id = tag.replace('.','-')+"#Name";
+                    row_cell.addEventListener('input', emit_message)
+                }
+            }
+        }
+        //console.log("Line - " + tag + ": " + value1 + ":" + value2 + " " + value2.name);
+    }
+
+    var socket = io.connect('http://' + document.domain + ':' + location.port);
+    socket.on('web_message', function(sio_data) {
+        // console.log('Web Message ' + data);
+        try {
+            var sio_text = JSON.stringify(sio_data);
+        } catch (e) {
+            var sio_text = sio_data;
+        }
+        var web_message = document.getElementById("web_message");
+        web_message.value = web_message.value + sio_text + '\n';
+    }).on('web_state', function(data) {
+        // console.log('Web State ' + data);
+        data_json = JSON.parse(data);
+        console.log('Data ' + data);
+        var msgid = data_json['id'];
+        console.log('ID ' + msgid);
+        var state = document.getElementById(msgid);
+        if (state) {
+            console.log(state);
+            console.log(state.value);
+            console.log(state.innerHTML);
+            state.innerHTML = data_json['state']
+            console.log(state.innerHTML);
+        }
+    });
+});
+
+</script>
+</html>
