@@ -59,10 +59,10 @@ async def credentials(request):
     payload[1] = str(int(serial_number.split('-')[1]))
     payload[2] = serial_number  # MQTT Client Username
     config = request.app['pethubconfig'][CFG]['MQTT']
-    if 'Username' in config:
-        payload[3] = config['Username']
-    if 'Password' in config:
-        payload[4] = config['Password']
+    if 'HubUsername' in config:
+        payload[3] = config['HubUsername']
+    if 'HubPassword' in config:
+        payload[4] = config['HubPassword']
     payload[6] = PH_HUB_T + serial_number  # MQTT Topic for Hub including serial number
     # Overwrite the MQTT Host for the hub if it is different from the current host, otherwise
     # point to the default value of hub.api.surehub.io which is the DNS poisoned current host
@@ -194,7 +194,18 @@ async def mqtt_start(app):
                 if 'Host' in app['pethubconfig'][CFG]['MQTT']:
                     mqtt_host = app['pethubconfig'][CFG]['MQTT']['Host']
                     log.info('MQTT: Init MQTT Host %s', mqtt_host)
-                    client = Client(hostname=mqtt_host, port=1883, client_id='PetHubLocal-2')
+                    mqtt_config = {
+                        'hostname': mqtt_host,
+                        'port': 1883,
+                        'client_id': 'PetHubLocal'
+                    }
+                    # Add Client Username / Password if it is in pethubconfig
+                    if app['pethubconfig'][CFG]['MQTT']['ClientUsername'] and app['pethubconfig'][CFG]['MQTT']['ClientPassword']:
+                        mqtt_config['username'] = app['pethubconfig'][CFG]['MQTT']['ClientUsername']
+                        mqtt_config['password'] = app['pethubconfig'][CFG]['MQTT']['ClientPassword']
+                    if app['pethubconfig'][CFG]['MQTT']['ClientPort']:
+                        mqtt_config['port'] = app['pethubconfig'][CFG]['MQTT']['ClientPort']
+                    client = Client(**mqtt_config)
                 else:
                     log.info('MQTT Host missing from config')
                     sys.exit(1)
