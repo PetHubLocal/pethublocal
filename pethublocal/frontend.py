@@ -200,11 +200,13 @@ async def mqtt_start(app):
                         'client_id': 'PetHubLocal'
                     }
                     # Add Client Username / Password if it is in pethubconfig
-                    if app['pethubconfig'][CFG]['MQTT']['ClientUsername'] and app['pethubconfig'][CFG]['MQTT']['ClientPassword']:
+                    if any(x in app['pethubconfig'][CFG]['MQTT'] for x in ['ClientUsername', 'ClientPassword']):
                         mqtt_config['username'] = app['pethubconfig'][CFG]['MQTT']['ClientUsername']
                         mqtt_config['password'] = app['pethubconfig'][CFG]['MQTT']['ClientPassword']
-                    if app['pethubconfig'][CFG]['MQTT']['ClientPort']:
+                    if 'ClientPort' in app['pethubconfig'][CFG]['MQTT']:
                         mqtt_config['port'] = app['pethubconfig'][CFG]['MQTT']['ClientPort']
+                        if mqtt_config['port'] == 8883:
+                            mqtt_config['tls_context'] = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
                     client = Client(**mqtt_config)
                 else:
                     log.info('MQTT Host missing from config')
