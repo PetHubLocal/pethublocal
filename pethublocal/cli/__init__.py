@@ -10,7 +10,7 @@ sys.path.append(dirname(dirname(sys.path[0])))
 import pethublocal.frontend as frontend
 from pethublocal import log
 from pethublocal.functions import config_load, config_save, download_firmware, download_credentials,\
-    config_local, start_to_pethubconfig, config_defaults, parse_firmware_log
+    config_local, start_to_pethubconfig, config_defaults, parse_firmware_log, build_firmware, find_firmware_xor_key
 from pethublocal.generate import generatemessage
 
 from pethublocal.consts import (
@@ -54,10 +54,12 @@ def firmware(ctx: click.Context, serialnumber: str, force: bool) -> None:
 @click.help_option("-h", "--help")
 @click.option("-sn", "--serialnumber", type=str, required=True, help="Hub Serial Number")
 @click.option("-mac", "--macaddress", type=str, required=True, help="Hub Serial MAC Address")
-def credentials(ctx: click.Context, serialnumber: str, macaddress: str) -> None:
+@click.option("-fw", "--firmware", type=str, required=True, help="Hub Firmware Version")
+def credentials(ctx: click.Context, serialnumber: str, macaddress: str, firmware: str) -> None:
     """ Download credentials for Hub from SureHub """
     log.info('Download Credentials Serial Number: %s MAC Address %s', serialnumber, macaddress)
-    log.info(download_credentials(serialnumber, macaddress))
+    pethubconfig = config_load()
+    log.info(download_credentials(pethubconfig, serialnumber, macaddress, firmware))
 
 
 @cli.command()
@@ -151,6 +153,32 @@ def parsefirmwarelog(ctx: click.Context, filename: str) -> None:
         answer = input(f'Update config {sn} with Password {password} ? Y/N')
         if len(answer) > 0 and answer[0].upper() == 'Y':
             print('Updating')
+
+
+@cli.command()
+@click.pass_context
+@click.help_option("-h", "--help")
+@click.option("-x", "--xorkey", type=str, required=True, help="XOR Key")
+@click.option("-h", "--hub", type=str, required=True, help="Hub Serial Number")
+def buildfirmware(ctx: click.Context, xorkey: str, hub: str) -> None:
+    """
+     Build firmware image
+    """
+    log.info('Build  Firmware Image')
+    build_firmware(xorkey, hub)
+
+
+@cli.command()
+@click.pass_context
+@click.help_option("-h", "--help")
+@click.option("-h", "--hub", type=str, required=True, help="Hub Serial Number")
+@click.option("-b", "--bootloader", type=str, required=True, help="Bootloader value")
+def findfirmwarexor(ctx: click.Context, hub: str, bootloader: str) -> None:
+    """
+     Find XOR Key and Long Serial aka Certificate Password in firmware image
+    """
+    log.info('Build  Firmware Image')
+    log.info('Firmware XOR: %s Long Serial %s', *find_firmware_xor_key(hub, bootloader))
 
 
 if __name__ == "__main__":

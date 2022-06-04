@@ -53,6 +53,8 @@ async def credentials(request):
     utctime = datetime.now(timezone.utc).strftime("%a, %d %b %Y %H:%M:%S %Z")
     body = urllib.parse.parse_qs(await request.text())
     serial_number = body['serial_number'][0]
+    mac_address = body['mac_address'][0]
+    firmware_version = body['firmware_version'][0]
     log.info('Hub Request ' + await request.text())
     # Set Default Values
     payload = ['v02', '', '', '', '', '1', '', SUREHUBHOST, '']
@@ -86,8 +88,10 @@ async def credentials(request):
         download_creds = True
     if download_creds:  # **TODO Fixup Cred Download
         mac_address = body['mac_address'][0]
-        log.info('Download Creds: ' + download_credentials(request.app['pethubconfig'], serial_number, mac_address))
-        payload[8] = hub['Client_Cert']
+        creds = download_credentials(hub, serial_number, mac_address, firmware_version).split(':')
+        log.info('Download Creds: %s', ':'.join(creds))
+        hub['Client_Cert'] = creds[8]
+        payload[8] = creds[8]
     response_body = ':'.join(payload)
     log.info('Hub Credentials Response ' + response_body)
     headers = MultiDict({'Date': utctime,
@@ -135,17 +139,23 @@ async def firmware(request):
     serial_number = body_dict['serial_number'][0]
     page = body_dict['page'][0]
     bootloader_version = body_dict['bootloader_version'][0]
-    filename = serial_number+'-'+bootloader_version+'-'+page.zfill(2)+'.bin'
-    log.info('HTTP: Firmware image file %s', filename)
+    customfirmware = f'{serial_number}-{FIRMWAREVERSION}-{page.zfill(2)}.bin'
+    standardfirmware = f'{serial_number}-{bootloader_version}-{page.zfill(2)}.bin'
+    if os.path.isfile(customfirmware):
+        filename = customfirmware
+    elif os.path.isfile(standardfirmware):
+        filename = standardfirmware
+    else:
+        # Download hub firmware if it doesn't exist locally from Surepet
+        log.info('Firmware Missing, need to download it')
+        # log.info('HTTP: Local firmware does not exist, downloading from Surepet')
+        # force_download = False
+        # if int(page) > 0:  # Force download if page is >0 and file doesn't exist
+        #     force_download = True
+        #     log.info('HTTP: Download firmware from surepet for %s ', serial_number)
+        # # download_firmware(serial_number, force_download)
 
-    # Download hub firmware if it doesn't exist locally from Surepet
-    if not os.path.isfile(filename):
-        log.info('HTTP: Local firmware does not exist, downloading from Surepet')
-        force_download = False
-        if int(page) > 0:  # Force download if page is >0 and file doesn't exist
-            force_download = True
-            log.info('HTTP: Download firmware from surepet for %s ', serial_number)
-        # download_firmware(serial_number, force_download)
+    log.info('HTTP: Firmware image file %s', filename)
 
     # Check if firmware update flag is enabled, and disable it during firmware update
     devices = request.app['pethubconfig']['Devices']

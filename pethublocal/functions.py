@@ -15,6 +15,7 @@ import dns.resolver
 import sys
 import codecs
 import urllib3
+import pkg_resources
 
 from pygments import highlight
 from pygments.lexers import JsonLexer
@@ -49,7 +50,7 @@ def external_dns_query(host, internal=False):
 
 def valid_serial(serial):
     """ Regex check the serial number is valid """
-    return re.match('H0[01][01-8]-0[0-9]{6}', serial)
+    return re.match('H0[01][0-9]-0[0-9]{6}', serial)
 
 
 def valid_hub_mac(mac_address):
@@ -86,16 +87,15 @@ def download_firmware(serialnumber, forcedownload):
      Download firmware for hub from SurePetCare, loop through pages based on header.
     """
     surehubio = external_dns_query(SUREHUBHOST)  # External query for hub.api.surehub.io
-    bootloader = BOOTLOADER
     return_message = ""
     if surehubio:
         log.info('SureHub Host %s IP Address: %s', SUREHUBHOST, surehubio)
         if valid_serial(serialnumber):
-            firmware = serialnumber + '-' + bootloader + '-00.bin'
+            firmware = serialnumber + '-' + BOOTLOADER + '-00.bin'
             if not os.path.isfile(firmware) or forcedownload:
                 # Download first firmware file and inspect the header for the number of records to download
                 log.info('Downloading first firmware record to get header information')
-                download_firmware_record(surehubio, serialnumber, bootloader, 0)
+                download_firmware_record(surehubio, serialnumber, BOOTLOADER, 0)
                 with open(firmware, "rb") as f:
                     # Read the 36 bytes of file header
                     byte = f.read(36).decode("utf-8").split()
@@ -104,7 +104,7 @@ def download_firmware(serialnumber, forcedownload):
                     log.info('Count: %s', str(recordcount))
                     for counter in range(1, recordcount):
                         log.info("Download remaining record: %s", str(counter))
-                        download_firmware_record(surehubio, serialnumber, bootloader, counter)
+                        download_firmware_record(surehubio, serialnumber, BOOTLOADER, counter)
                 return_message = "Firmware successfully downloaded"
             else:
                 return_message = 'Firmware already downloaded ' + firmware
@@ -114,7 +114,7 @@ def download_firmware(serialnumber, forcedownload):
         return_message = 'Issue with External DNS lookup'
     return return_message
 
-def download_credentials(hub, serialnumber, mac_address):
+def download_credentials(hub, serial_number, mac_address, firmware_version):
     """
      Credentials file request hub makes each time it boots to retrieve the MQTT endpoint and client certificate
      serial_number=H0xx-0xxxxxx&mac_address=0000xxxxxxxxxxxx&product_id=1&firmware_version=2.43
@@ -122,14 +122,14 @@ def download_credentials(hub, serialnumber, mac_address):
     surehubio = external_dns_query(SUREHUBHOST)  # External query for hub.api.surehub.io
     if surehubio:
         log.info('SureHub Host %s IP Address: %s', SUREHUBHOST, surehubio)
-        if valid_serial(serialnumber) and valid_hub_mac(mac_address):
-            creds_filename = serialnumber + '-' + mac_address + '-' + FIRMWAREVERSION + '.bin'
+        if valid_serial(serial_number) and valid_hub_mac(mac_address):
+            creds_filename = serial_number + '-' + mac_address + '-' + firmware_version + '.bin'
             url = 'https://' + surehubio + '/api/credentials'
             headers = {'User-Agent': HUBUSERAGENT,
-                       'Content-Type': 'application/x-www-form-urlencoded', 'Host': 'hub.api.surehub.io',
+                       'Content-Type': 'application/x-www-form-urlencoded', 'Host': SUREHUBHOST,
                        'Connection': None, 'Accept-Encoding': '*/*'}
-            postdata = 'serial_number=' + serialnumber.upper() + '&mac_address=' \
-                       + mac_address.upper() + '&product_id=1&firmware_version=' + FIRMWAREVERSION
+            postdata = 'serial_number=' + serial_number.upper() + '&mac_address=' \
+                       + mac_address.upper() + '&product_id=1&firmware_version=' + str(firmware_version)
             log.info('Credentials Post Header: ' + postdata)
             try:
                 response = requests.post(url, data=postdata, headers=headers, verify=False)
@@ -369,12 +369,29 @@ def config_load(setup=False, force=False):
                         for hubs, devs in config.Devices.items():
                             for dev, key in devs.items():
                                 if dev == 'Hub':
+                                    log.info('Current Hub Firmware %s', key.Device.Firmware)
                                     serial_number = key.Serial_Number
                                     mac_address = key.Mac_Address
-                                    log.info('Downloading Credentials for %s mac %s', serial_number, mac_address)
-                                    log.info(download_credentials(key, serial_number, mac_address))
-                                    log.info('Downloading Firmware for %s', serial_number)
+                                    firmware = str(key.Device.Firmware)
+                                    log.info('Downloading Current Firmware for %s', serial_number)
                                     log.info(download_firmware(serial_number, force))
+                                    if firmware != "2.43":
+                                        log.info("Your device has been upgraded to version %s and since it isn't running 2.43 this version "
+                                                 "the Hub now checks the server certificate is legitimate before connecting (boo! :( ) "
+                                                 "so you will need to downgrade the hub to 2.43 which for the moment is easy as holding "
+                                                 "the reset button underneath the hub when the DNS is poisoned to point to PetHubLocal (Yay!)", firmware)
+                                        # Find the XOR Key and Long Serial aka Certificate Password based off firmware
+                                        xor_key, long_serial = find_firmware_xor_key(serial_number, BOOTLOADER)
+                                        config.merge_update({'Devices': {hubs:{dev:{
+                                            'XOR_Key': xor_key,
+                                            'Long_Serial': long_serial
+                                        }}}})
+                                        # Build specific 2.43 firmware that doesn't check the SSL Cert for this hub using XOR key
+                                        build_firmware(xor_key, serial_number)
+
+                                    log.info('Downloading Credentials for %s MAC: %s Firmware: %s', serial_number, mac_address, firmware)
+                                    log.info(download_credentials(key, serial_number, mac_address, firmware))
+
                     mqtt_broker = input('MQTT Broker running on this host? Y/N ')
                     if len(mqtt_broker) > 0 and mqtt_broker[0].upper() == 'N':
                         mqtt_broker_ip = input('MQTT Broker IP:')
@@ -1055,13 +1072,18 @@ def converttimetominutes(timearray):
     return str((timearray[0] * 60) + timearray[1])
 
 
+def map_long_serial_key(long_serial_key):
+    # log.debug('Long Serial Key - %s', "".join(long_serial_key.values()))
+    return ''.join(list(map(long_serial_key.get, LONG_SERIAL_ORDER))).upper()
+
+
 def parse_firmware_log(filename):
     """ Parse firmware update log and return password """
     if os.path.isfile(filename):
         with codecs.open(filename, 'r', encoding='utf-8', errors='ignore') as firmware:
             sn = ""
             long_serial_found = False
-            serial = {}
+            long_serial_key = {}
             while True:
                 line = firmware.readline()
                 if not line:  # EOF
@@ -1073,12 +1095,9 @@ def parse_firmware_log(filename):
                 if long_serial_found:
                     if "length=1024" in line:
                         # Long Serial number footer.
-                        log.info("Long Serial extracted")
-                        log.info('Firmware String for      %s : %s ', sn, "".join(serial.values()))
-                        long_serial_order = [10, 7, 8, 11, 0, 5, 12, 13, 15, 1, 2, 14, 4, 6, 3, 9]
-                        password = ''.join(list(map(serial.get, long_serial_order))).upper()
-                        log.info('Certificate Password for %s : %s ', sn, password )
-                        return sn, password
+                        long_serial = map_long_serial_key(long_serial_key)
+                        log.info('Long Serial aka Certificate Password for %s : %s ', sn, long_serial )
+                        return sn, long_serial
                     else:
                         if len(line) > 2:  # ignore blank lines
                             if line.startswith("10 "):
@@ -1086,11 +1105,102 @@ def parse_firmware_log(filename):
                                 exit(1)
                             line_split = line.split()
                             # Pad zero to make a byte if it is a single character
-                            serial[int(line_split[0], 16)] = line_split[1].zfill(2)
-                if "Read 319a 1d000000 47 1d000000 1000 1" in line and long_serial_found == False:
+                            long_serial_key[int(line_split[0], 16)] = line_split[1].zfill(2)
+                if "Read " in line and " 1d000000 1000 1" in line and long_serial_found == False:
                     # Long Serial number header found.
                     log.info("Long Serial Header Found")
                     long_serial_found = True
         firmware.close()
     else:
         log.info('File not found')
+
+
+def find_firmware_xor_key(serial_number, boot_loader):
+    """
+      Firmware records have a 36 byte header and double XORed key. The header has 6 values delimited with a space
+      - CRC16 - 2 Bytes
+      - Memory Offset to wipe(?) - 4 Bytes
+      - Record count - 2 Bytes in hex
+      - Memory Offset to write firmware to
+      - Record length
+      - Always 01
+      The trick with finding the XOR Key is the key length is 16 bytes, and the most frequently used value in the deXORed
+      firmware is typically all 0's so if you split the PFM firmware into 16 byte chunks and add them all into a key pair
+      dict then find the most frequent value that is the XOR key.
+
+      Thanks Toby for figuring this one out, you are a **superstar**!!
+    """
+    # PFM Record Count, 3rd field in hex
+    with open(f'{serial_number}-{boot_loader}-00.bin', 'rb') as f:
+        header = f.read(36).decode("utf-8").split()
+        record_count = int(header[2], 16)
+        log.info('Firmware XOR: Record Count - %s', str(record_count))
+        # if firmware == '319a'
+
+    # Create pairs finding breaking it into 16 bytes which is the XOR key size.
+    key = {}
+    for record in range(0, record_count):
+        with open(f'{serial_number}-{boot_loader}-{str(record).zfill(2)}.bin', 'rb') as file:
+            file.seek(36)  # Skip header
+            firmware_hex = file.read().hex()
+            if len(firmware_hex) == 8192:
+                while len(firmware_hex) > 1:
+                    record = firmware_hex[:32]  # XOR is 16 bytes
+                    firmware_hex = firmware_hex[32:]  # Remove 16 bytes from hex
+                    if record in key:
+                        key[record] += 1  # Has existing record
+                    else:
+                        key[record] = 1  # New record
+
+    # Find XOR key in key array, most frequent value in deXORed file is all 0's so that is the key.
+    xor_key = bytes.fromhex(sorted(key, key=key.get, reverse=True)[0])
+    log.info('Firmware XOR: Found XOR Key - %s', xor_key.hex().upper())
+
+    # XOR with Found XOR Key and Static XOR Key to find Long Key for Long Serial
+    long_serial_key = bytes(x ^ y for x, y in zip(xor_key, FIRMWARE_STATIC_XOR_KEY))
+    log.info('Firmware XOR: Long Serial Key - %s', long_serial_key.hex().upper())
+
+    # Convert to Bytes to Dict as it's just easier to use map.
+    long_serial_dict = {i: f'{long_serial_key[i]:0x}'.zfill(2) for i in range(0, len(long_serial_key))}
+    long_serial = map_long_serial_key(long_serial_dict)
+
+    log.info('Firmware XOR: Long Serial aka Certificate Password - %s', long_serial)
+
+    return xor_key.hex().upper(), long_serial
+
+
+def build_firmware(xor_key, serial_number):
+    """
+      Build firmware based on known/found XOR key and name the files after serial_number
+    """
+    firmware = f'{serial_number}-{FIRMWAREVERSION}-00.bin'
+    if not os.path.isfile(firmware):
+        log.info('Firmware: Building version %s firmware', str(FIRMWAREVERSION))
+        package_dir = pkg_resources.resource_filename('pethublocal', "firmware")
+        # Find the number of records / pages based on FIRMWAREVERSION
+        with open(f'{package_dir}/Firmware-{FIRMWAREVERSION}-00.bin', 'rb') as f:
+            headersplit = f.read(36).decode("utf-8").split()
+            record_count = int(headersplit[2], 16)
+
+        # Handle if we pass the XOR Key as a string
+        if isinstance(xor_key, str):
+            xor_key = bytes.fromhex(xor_key)
+        # Encrypting firmware with XOR key for serial number PFM, DCR and BFM
+        for record in range(0, record_count + 6):
+            with open(f'{package_dir}/Firmware-{FIRMWAREVERSION}-{str(record).zfill(2)}.bin', 'rb') as file:
+                header = file.read(36)
+                firmware_hex = file.read().hex()
+                payload = bytes()
+
+                # Reapply XOR to this serial number firmware file
+                while len(firmware_hex) > 1:
+                    current_record = bytes.fromhex(firmware_hex[:32])
+                    payload += bytes(x ^ y for x, y in zip(xor_key, current_record))
+                    firmware_hex = firmware_hex[32:]
+
+                with open(f'{serial_number}-{FIRMWAREVERSION}-{str(record).zfill(2)}.bin', 'wb') as to_file:
+                    to_file.write(header + payload)
+                    to_file.close()
+        log.info('Firmware: Custom firmware built')
+    else:
+        log.info('Firmware %s already exists', firmwares)

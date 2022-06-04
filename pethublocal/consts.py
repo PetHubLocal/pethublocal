@@ -24,6 +24,10 @@ LOGNAME = "pethublocal.log"    # Log Name
 
 # Pet Hub Config file
 CONFIGFILE = 'pethubconfig.json'
+PHC = 'pethubconfig'
+
+LONG_SERIAL_ORDER = [10, 7, 8, 11, 0, 5, 12, 13, 15, 1, 2, 14, 4, 6, 3, 9]  # Order of Long Serial from Long Serial Key
+FIRMWARE_STATIC_XOR_KEY = bytes.fromhex('a71e569f3ed42a73cc4170bbf3d34e69')  # Firmware Static XOR key
 
 # SureHub Endpoints - Frontend API endpoint for retrieving start.json
 SUREHUBAPP = 'app.api.surehub.io'  # Browser API Endpoint
