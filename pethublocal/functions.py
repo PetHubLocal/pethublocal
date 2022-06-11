@@ -114,6 +114,7 @@ def download_firmware(serialnumber, forcedownload):
         return_message = 'Issue with External DNS lookup'
     return return_message
 
+
 def download_credentials(hub, serial_number, mac_address, firmware_version):
     """
      Credentials file request hub makes each time it boots to retrieve the MQTT endpoint and client certificate
@@ -174,8 +175,8 @@ def download_start(pethubconfig):
             del phc_config['Token']
 
     # Authenticate to Login Endpoint
-    while 'Token' not in phc_config:
-        if 'Username' not in phc_config or phc_config.LoggedIn is False:
+    while 'Token' not in phc_config or phc_config.LoggedIn is False:
+        if 'Username' not in phc_config:
             initial = input('Cloud Config - Start initial setup Y/N?')
             if len(initial) > 0 and initial[0].upper() == 'Y':
                 username = input('SurePetCare Cloud EMail Address: ')
@@ -197,7 +198,7 @@ def download_start(pethubconfig):
         })
         log.info('Cloud Config: Authenticate to retrieve JWT Bearer Token: %s', postdata)
         try:
-            response = requests.post(url, data=postdata, headers=headers)
+            response = requests.post(url, data=postdata, headers=headers, verify=False)
             response.raise_for_status()  # Ensure we notice bad responses
             log.info('Authentication successful response.json() %s', json.dumps(response.json()))
             token = response.json()['data']['token']
@@ -231,12 +232,12 @@ def download_start(pethubconfig):
                    'Authorization': 'Bearer ' + phc_config['Token'],
                    'Accept': 'application/json'}
         try:
-            response = requests.get(url, headers=headers)
+            response = requests.get(url, headers=headers, verify=False)
             response.raise_for_status()  # Ensure we notice bad responses
             log.info(response.json()['data'])
             startjson = "start-" + str(datetime.now().strftime("%Y%m%d-%H%M%S")) + ".json"
             with open(startjson, 'w') as fp:
-                json.dump(response.json()['data'], fp, indent=4)
+                json.dump(response.json(), fp, indent=4)
             phc_config.merge_update({'StartJSON': startjson})
             log.info('Cloud Config: Download successful response: %s', response)
             resp = response.json()['data']
@@ -407,6 +408,65 @@ def config_load(setup=False, force=False):
                 log.info('Building from Local Configuration')
                 config.merge_update({CFG: {'Deployment': 'Local'}})
     return config
+
+
+def config_addon(username, password):
+    """ Create Config if it doesn't exist when using the Home Assistant Addon """
+    state = False
+    if os.path.isfile(CONFIGFILE):
+        log.info(f'Config file {CONFIGFILE} found, ready to start')
+        state = True
+    elif not os.path.isfile(CONFIGFILE) and len(username) > 4 and len(password) > 2:
+        config = Box()
+        config.merge_update(config_defaults())
+        config.merge_update({'Config': {'Deployment': 'Addon',
+                                        'Cloud': {
+                                            'Username': username,
+                                            'Password': password}}})
+        config_save(config)
+        # log.info('External DNS entry for %s: %s', SUREHUBHOST, external_dns_query(SUREHUBHOST))
+        # log.info('Internal DNS entry for %s: %s', SUREHUBHOST, external_dns_query(SUREHUBHOST, True))
+
+        start = Box()
+        if 'StartJSON' not in config.Config.Cloud:
+            start.merge_update(download_start(config))
+
+        if len(start) > 5:
+            config.merge_update(start_to_pethubconfig(config, start))
+            config_save(config)
+            log.info('Start parsed and saved to config')
+
+            for hubs, devs in config.Devices.items():
+                for dev, key in devs.items():
+                    if dev == 'Hub':
+                        log.info('Current Hub Firmware %s', key.Device.Firmware)
+                        serial_number = key.Serial_Number
+                        mac_address = key.Mac_Address
+                        firmware = str(key.Device.Firmware)
+                        log.info('Downloading Current Firmware for %s', serial_number)
+                        log.info(download_firmware(serial_number, False))
+                        # Find the XOR Key and Long Serial aka Certificate Password based off firmware
+                        xor_key, long_serial = find_firmware_xor_key(serial_number, BOOTLOADER)
+                        config.merge_update({'Devices': {hubs:{dev:{
+                            'XOR_Key': xor_key,
+                            'Long_Serial': long_serial
+                        }}}})
+                        if firmware != "2.43":
+                            log.info("Your device has been upgraded to version %s and since it isn't running 2.43 this version "
+                                     "the Hub now checks the server certificate is legitimate before connecting (boo! :( ) "
+                                     "so you will need to downgrade the hub to 2.43 which for the moment is easy as holding "
+                                     "the reset button underneath the hub when the DNS is poisoned to point to PetHubLocal (Yay!)", firmware)
+                            # Build specific 2.43 firmware that doesn't check the SSL Cert for this hub using XOR key
+                            build_firmware(xor_key, serial_number)
+                        log.info('Downloading Credentials for %s MAC: %s Firmware: %s', serial_number, mac_address, firmware)
+                        log.info(download_credentials(key, serial_number, mac_address, firmware))
+
+            config.merge_update({'Config': {'MQTT': {'Host': '127.0.0.1'}}})
+            config_save(config)
+            state = True
+    else:
+        log.info(f'Missing {CONFIGFILE} or username and password')
+    return state
 
 
 def config_save(pethubconfig):

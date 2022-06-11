@@ -70,7 +70,7 @@ py-version = "3.9"
 runtime-typing = false
 
 [tool.pylint.FORMAT]
-max-line-length = 150
+max-line-length = 200
 disable = [ "invalid-name", "too-many-nested-blocks", "too-many-branches", "too-many-statements", "too-many-lines" ]
 
 #[tool.pylint.messages_control]

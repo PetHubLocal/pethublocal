@@ -21,6 +21,7 @@ FIRMWARECACHE = True           # Cache a local copy of your firmware
 FIRMWAREFORCEDOWNLOAD = False  # Force Download cached copy even if firmware has been locally cached
 EXTERNALDNSSERVER = '8.8.8.8'  # Default DNS Server, using Google
 LOGNAME = "pethublocal.log"    # Log Name
+MQTTSLEEP = 0.5                # Time to sleep between MQTT Messages as hub and HA doesn't like tem too quickly
 
 # Pet Hub Config file
 CONFIGFILE = 'pethubconfig.json'

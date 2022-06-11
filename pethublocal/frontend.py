@@ -32,7 +32,8 @@ from .consts import (
     LOGLEVEL,
     CFG,
     DEV,
-    REINITDAYS
+    REINITDAYS,
+    MQTTSLEEP
 )
 
 import logging
@@ -236,13 +237,13 @@ async def mqtt_start(app):
                         for topic, message in ha_init.items():
                             log.debug('HA_INIT: Topic:%s Message:%s', topic, message)
                             await client.publish(topic, message, qos=0, retain=True)
-                            await sleep(0.2)  # Sleep as HA doesn't like getting a lot of messages at once
+                            await sleep(MQTTSLEEP)  # Sleep as HA doesn't like getting a lot of messages at once
                         # Re-init States
                         ha_init_state = ha_update_state(app['pethubconfig'])
                         for topic, message in ha_init_state.items():
                             log.debug('HA_INIT: Pet Topic:%s Message:%s', topic, message)
                             await client.publish(topic, message, qos=0, retain=True)
-                            await sleep(0.2)  # Sleep as HA doesn't like getting a lot of messages at once
+                            await sleep(MQTTSLEEP)  # Sleep as HA doesn't like getting a lot of messages at once
                         app['pethubconfig'][CFG]['Last_HA_Init'] = calendar.timegm(datetime.utcnow().timetuple())
 
                 # Query Hub Devices for current Time and Battery State on startup
@@ -257,7 +258,7 @@ async def mqtt_start(app):
                                         topic = list(generatemessage(app['pethubconfig'], hub,
                                                             values.Product_Id, update, mac=values['Mac_Address']).items())[0]
                                         await client.publish(topic[0],topic[1], qos=1, retain=False)
-                                        await sleep(0.2)  # Sleep as HA doesn't like getting a lot of messages at once
+                                        await sleep(MQTTSLEEP)  # Sleep as HA doesn't like getting a lot of messages at once
                                     app['pethubconfig'][DEV][hub][device]['Last_Device_Update'] = calendar.timegm(datetime.utcnow().timetuple())
 
                 config_save(app['pethubconfig'])

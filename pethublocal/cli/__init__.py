@@ -10,7 +10,8 @@ sys.path.append(dirname(dirname(sys.path[0])))
 import pethublocal.frontend as frontend
 from pethublocal import log
 from pethublocal.functions import config_load, config_save, download_firmware, download_credentials,\
-    config_local, start_to_pethubconfig, config_defaults, parse_firmware_log, build_firmware, find_firmware_xor_key
+    config_local, start_to_pethubconfig, config_defaults, parse_firmware_log, build_firmware, find_firmware_xor_key,\
+    config_addon
 from pethublocal.generate import generatemessage
 
 from pethublocal.consts import (
@@ -179,6 +180,18 @@ def findfirmwarexor(ctx: click.Context, hub: str, bootloader: str) -> None:
     """
     log.info('Build  Firmware Image')
     log.info('Firmware XOR: %s Long Serial %s', *find_firmware_xor_key(hub, bootloader))
+
+
+@cli.command()
+@click.pass_context
+@click.help_option("-h", "--help")
+@click.option('-u', '--username', type=str, help="Cloud Username/EMail Address")
+@click.option('-p', '--password', type=str, help="Cloud Password")
+def addon(ctx: click.Context, username: str, password: str) -> None:
+    """ Start from Home Assistant Add-On with Cloud Username and Password as parameters """
+    if config_addon(username, password):
+        log.info('Start Pet Hub Local - Always blow on the pie, safer communities together')
+        frontend.serve_pet_hub()
 
 
 if __name__ == "__main__":

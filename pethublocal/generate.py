@@ -4,7 +4,7 @@
 """
 import re
 
-from datetime import date, datetime, timezone
+from datetime import date, datetime
 from dateutil import tz
 from box import Box
 
@@ -18,6 +18,7 @@ from . import log
 
 
 def hex_spaces(ba):
+    """ Return hex string with spaces, as hex(' ') isn't supported in python 3.9 """
     return " ".join("{:02x}".format(x) for x in ba)
 
 
@@ -29,14 +30,13 @@ def dt_to_hub_ts(n):
 
 
 def hours_to_dt(hours):
+    """ Convert hours and minutes to timestamp """
     local_datetime = datetime.strptime(hours, '%H:%M').time()
     return datetime.combine(date.today(), local_datetime).astimezone(tz.tzutc())
 
 
 def tag_to_hex(tag):
-    """
-     Convert Tag to Hex String with spaces to send to devices devices (not Pet Door)
-    """
+    """ Convert Tag to Hex String with spaces to send to devices except the Pet Door """
     if "." in tag:
         # FDX-B tag - Append 01 for tag type.
         # Create int list from split of tag
@@ -54,9 +54,7 @@ def tag_to_hex(tag):
 
 
 def door_tag_to_hex(tag):
-    """
-     Convert Tag to Hex String with spaces for Pet Door
-    """
+    """ Convert Tag to Hex String with spaces for Pet Door """
     if "." in tag:
         # FDX-B tag - Prepend 01 for tag type.
         # Create int list from split of tag
@@ -86,12 +84,8 @@ def generatemessage(pethubconfig, hub, product_id, operation, **genmsg):
     result = None
     error = None
     operationupper = operation.upper()
-    if 'mac' in genmsg:
-        mac = genmsg['mac']
-    if 'suboperation' in genmsg:
-        suboperation = genmsg['suboperation']
-    else:
-        suboperation = ''
+    mac = genmsg.get('mac', '')
+    suboperation = genmsg.get('suboperation', '')
 
     # Add device variable
     if product_id != 1 and 'mac' in genmsg and genmsg['mac'] in pethubconfig['Devices'][hub]:

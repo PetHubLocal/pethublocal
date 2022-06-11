@@ -5,14 +5,15 @@
 # from importlib.metadata import version
 # __version__ = version(__name__)
 __version__ = '2'
+import logging
+from logging.handlers import TimedRotatingFileHandler
 from .consts import (
     LOGLEVEL,
     LOGNAME
 )
-import logging
-from logging.handlers import TimedRotatingFileHandler
 
 def log_renamer(log_name):
+    """ Log Renamer """
     base_filename, ext, date = log_name.split(".")
     return f"{base_filename}.{date}.{ext}"
 

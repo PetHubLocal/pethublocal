@@ -299,23 +299,24 @@ class FeederCustomMode(SureFlag):
 
 class PetDoorCustomMode(SureFlag):
     """ Custom Modes on the Pet Door """
-    Disabled = 0           # All custom modes disabled
-    Nonselective = 0x1     # Custom Mode 1 - Non Selective Entry - Unlocks the door inbdound so any animal can come in
-    Rechargeables = 0x2    # Custom Mode 2 - Rechargeable Batteries so work with lower voltage from 1.2v Rechargeables vs 1.5v Alkaline
-    Threeseconds = 0x4     # Custom Mode 3 - Timid Pets - 3 Seconds delay before closing door
-    Tenseconds = 0x8       # Custom Mode 4 - Slower Locking - 10 Seconds delay before closing door
-    Intruder = 0x10        # Custom Mode 5 - Intruder Mode - Lock outside locks when non-provisioned animal detected by sensor
-    Oppositecurfew = 0x20  # Custom Mode 6 - Opposite Curfew mode - Lock KeepOut rather than KeepIn
-    BIT7 = 0x40            # Bit7 - ?
-    BIT8 = 0x80            # Bit8 - ?
-    BIT9 = 0x100           # Bit9 - ?
-    Extendedrange = 0x200  # Custom Mode 10 - Extended Mode - Extend range of scanning the tags
-    BIT11 = 0x400          # Bit11 - ?
-    BIT12 = 0x800          # Bit12 - ?
-    BIT13 = 0x1000         # Bit13 - ?
-    BIT14 = 0x2000         # Bit14 - ?
-    BIT15 = 0x4000         # Bit15 - ?
-    BIT16 = 0x8000         # Bit16 - ?
+    Disabled = 0              # All custom modes disabled
+    Nonselective = 0x1        # Custom Mode 1 - Non-selective Entry - Unlocks the door inbound so any animal can come in
+    Rechargeables = 0x2       # Custom Mode 2 - Rechargeable Batteries so work with lower voltage from 1.2v Rechargeables vs 1.5v Alkaline
+    ThreeSeconds = 0x4        # Custom Mode 3 - Timid Pets - 3 Seconds delay before closing door
+    TenSeconds = 0x8          # Custom Mode 4 - Slower Locking - 10 Seconds delay before closing door
+    Intruder = 0x10           # Custom Mode 5 - Intruder Mode - Lock outside locks when non-provisioned animal detected by sensor to prevent door being pulled open
+    OppositeCurfew = 0x20     # Custom Mode 6 - Opposite Curfew mode - Lock KeepOut rather than KeepIn
+    LockedCurfew = 0x40       # Custom Mode 7 - Fully Locking Curfew Mode - Locks both in and out locks when in curfew mode
+    MetalMode1 = 0x80         # Custom Mode 8 - Metal Interference - This mode will help with severe metal interference in an installation
+    MetalMode2 = 0x100        # Custom Mode 9 - Metal Interference - This mode will help with severe metal interference in an installation
+    ExtendedRange = 0x200     # Custom Mode 10 - Extended Mode - Extend frequency of scanning the tags
+    ExtendedIntruder = 0x400  # Custom Mode 11 - Extended Intruder Mode - Extended Intruder Mode - Registers presence of intruder animal trying to enter the house and closes outside lock to prevent door being pulled open for longer period
+    BIT12 = 0x800             # Bit12 - ?
+    DoubleChip1 = 0x1000      # Custom Mode 13 - Double Chip Operating Mode 1 - Allow animal with two tags interfering with each other to enter
+    DoubleChip2 = 0x2000      # Custom Mode 14 - Double Chip Operating Mode 2 - Allow animal with two tags interfering with each other to enter
+    DoubleChip3 = 0x4000      # Custom Mode 15 - Double Chip Operating Mode 3 - Allow animal with two tags interfering with each other to enter
+    ProximityTest = 0x8000    # Custom Mode 16 - Proximity Sensor Test - Test the proximity function of the door.
+
 
     """
     class CatFlapCustomMode(SureFlag):  # Custom Modes on the Feeder
