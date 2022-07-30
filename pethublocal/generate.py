@@ -86,6 +86,7 @@ def generatemessage(pethubconfig, hub, product_id, operation, **genmsg):
     operationupper = operation.upper()
     mac = genmsg.get('mac', '')
     suboperation = genmsg.get('suboperation', '')
+    tag = genmsg.get('tag', '')
 
     # Add device variable
     if product_id != 1 and 'mac' in genmsg and genmsg['mac'] in pethubconfig['Devices'][hub]:
@@ -95,26 +96,26 @@ def generatemessage(pethubconfig, hub, product_id, operation, **genmsg):
 
     if product_id == 1:  # Hub
         operations = Box({
-            "DumpRegisters": {"msg": "3 0 205",   "desc": "Dump current configuration"},                    # Dump all memory registers from 0 to 205
-            "Adopt":         {"msg": "2 15 1 02", "desc": "Enable adoption mode to adopt devices."},        # Enable adoption mode to adopt new devices
-            "AdoptDisable":  {"msg": "2 15 1 00", "desc": "Disable adoption mode"},                         # Disable adoption mode
-            "AdoptButton":   {"msg": "2 15 1 82", "desc": "Enable adoption using reset button."},           # Enable adoption mode as if you pressed the button under the hub
-            "EarsOff":       {"msg": "2 18 1 00", "desc": "Ears off"},                                      # Ears off state
-            "EarsOn":        {"msg": "2 18 1 01", "desc": "Ears on"},                                       # Ears on state
-            "EarsDimmed":    {"msg": "2 18 1 04", "desc": "Ears dimmed"},                                   # Ears dimmed state
-            "FlashEarsOff":  {"msg": "2 18 1 80", "desc": "Flash ears 3 times and return to ears off"},     # Flash the ears 3 times, return to off state
-            "FlashEarsOn":   {"msg": "2 18 1 81", "desc": "Flash ears 3 times and return to ears on"},      # Flash the ears 3 times, return to on state
-            "FlashEarsDim":  {"msg": "2 18 1 84", "desc": "Flash ears 3 times and return to ears dimmed"},  # Flash the ears 3 times, return to dimmed state
-            "RemoveDev0":    {"msg": "2 22 1 00", "desc": "Remove Provisioned device 0"},                   # Remove Provisioned device 0
-            "RemoveDev1":    {"msg": "2 22 1 01", "desc": "Remove Provisioned device 1"},                   # Remove Provisioned device 1
-            "RemoveDev2":    {"msg": "2 22 1 02", "desc": "Remove Provisioned device 2"},                   # Remove Provisioned device 2
-            "RemoveDev3":    {"msg": "2 22 1 03", "desc": "Remove Provisioned device 3"},                   # Remove Provisioned device 3
-            "RemoveDev4":    {"msg": "2 22 1 04", "desc": "Remove Provisioned device 4"},                   # Remove Provisioned device 4
-            "RemoveDev5":    {"msg": "2 22 1 05", "desc": "Remove Provisioned device 5"},                   # Remove Provisioned device 5
-            "RemoveDev6":    {"msg": "2 22 1 06", "desc": "Remove Provisioned device 6"},                   # Remove Provisioned device 6
-            "RemoveDev7":    {"msg": "2 22 1 07", "desc": "Remove Provisioned device 7"},                   # Remove Provisioned device 7
-            "RemoveDev8":    {"msg": "2 22 1 08", "desc": "Remove Provisioned device 8"},                   # Remove Provisioned device 8
-            "RemoveDev9":    {"msg": "2 22 1 09", "desc": "Remove Provisioned device 9"}                    # Remove Provisioned device 9
+            "DumpRegisters":   {"msg": "3 0 205",   "desc": "Dump current configuration"},                    # Dump all memory registers from 0 to 205
+            "Pairing":         {"msg": "2 15 1 02", "desc": "Enable pairing mode to adopt devices."},         # Enable adoption mode to adopt new devices
+            "PairingDisable":  {"msg": "2 15 1 00", "desc": "Disable pairing mode"},                          # Disable adoption mode
+            "PairingButton":   {"msg": "2 15 1 82", "desc": "Enable pairing using reset button."},            # Enable adoption mode as if you pressed the button under the hub
+            "EarsOff":         {"msg": "2 18 1 00", "desc": "Ears off"},                                      # Ears off state
+            "EarsBright":      {"msg": "2 18 1 01", "desc": "Ears bright"},                                   # Ears bright state
+            "EarsDimmed":      {"msg": "2 18 1 04", "desc": "Ears dimmed"},                                   # Ears dimmed state
+            "FlashEarsOff":    {"msg": "2 18 1 80", "desc": "Flash ears 3 times and return to ears off"},     # Flash the ears 3 times, return to off state
+            "FlashEarsBright": {"msg": "2 18 1 81", "desc": "Flash ears 3 times and return to ears on"},      # Flash the ears 3 times, return to on state
+            "FlashEarsDim":    {"msg": "2 18 1 84", "desc": "Flash ears 3 times and return to ears dimmed"},  # Flash the ears 3 times, return to dimmed state
+            "RemoveDev0":      {"msg": "2 22 1 00", "desc": "Remove Provisioned device 0"},                   # Remove Provisioned device 0
+            "RemoveDev1":      {"msg": "2 22 1 01", "desc": "Remove Provisioned device 1"},                   # Remove Provisioned device 1
+            "RemoveDev2":      {"msg": "2 22 1 02", "desc": "Remove Provisioned device 2"},                   # Remove Provisioned device 2
+            "RemoveDev3":      {"msg": "2 22 1 03", "desc": "Remove Provisioned device 3"},                   # Remove Provisioned device 3
+            "RemoveDev4":      {"msg": "2 22 1 04", "desc": "Remove Provisioned device 4"},                   # Remove Provisioned device 4
+            "RemoveDev5":      {"msg": "2 22 1 05", "desc": "Remove Provisioned device 5"},                   # Remove Provisioned device 5
+            "RemoveDev6":      {"msg": "2 22 1 06", "desc": "Remove Provisioned device 6"},                   # Remove Provisioned device 6
+            "RemoveDev7":      {"msg": "2 22 1 07", "desc": "Remove Provisioned device 7"},                   # Remove Provisioned device 7
+            "RemoveDev8":      {"msg": "2 22 1 08", "desc": "Remove Provisioned device 8"},                   # Remove Provisioned device 8
+            "RemoveDev9":      {"msg": "2 22 1 09", "desc": "Remove Provisioned device 9"}                    # Remove Provisioned device 9
         })
         if operation == "operations":
             result = operations
@@ -138,6 +139,7 @@ def generatemessage(pethubconfig, hub, product_id, operation, **genmsg):
             "KEEPOUT":       {"msg": "2 36 1 02",                   "desc": "Keep pets out"},                         # Keep Pets out
             "LOCKED":        {"msg": "2 36 1 03",                   "desc": "Locked both way"},                       # Locked both ways
             "CURFEW":        {"msg": "2 36 1 04",                   "desc": "Curfew enabled"},                        # Curfew mode enabled
+            "NEXTTAG":       {"msg": "2 60 1 01",                   "desc": "Curfew enabled"},                        # Curfew mode enabled
             "LOCKSTATE39":   {"msg": "2 39 1 01",                   "desc": "Lock State 39"},                         # Not sure if this is needed, but it was set once during set locking state.
             "TAGPROVISION":  {"msg": "2 II 7 CC CC CC CC CC CC CC", "desc": "TAG Provision"},                         # Tag Provision
             "CURFEWS":       {"msg": "2 519 6 SS FF FF TT TT 00",   "desc": "Set Curfew time From / To"},             # Enable curfew time from database
@@ -151,19 +153,22 @@ def generatemessage(pethubconfig, hub, product_id, operation, **genmsg):
 
             # Custom Mode
             if "CM CM CM" in message:
-                if PetDoorCustomMode.has_member(suboperation.title()):
-                    customvalue = PetDoorCustomMode[suboperation.title()].value
-                    print('Custom', type(customvalue), customvalue)
-                    # if customvalue != 0:
-                    #     currentcustom = PetDoorCustomMode(device['Custom_Mode'] if 'Custom_Mode' in device else 0)
-                    #     # finalcustom = currentcustom | customvalue
-                    device.merge_update({'Custom_Mode': customvalue})
-                    # pethubconfig['Devices'] = devices
-                    print('Custom2',customvalue.to_bytes(3, 'big').hex())
-                    message = message.replace("CM CM CM", customvalue.to_bytes(3, 'big').hex(' '))
-                else:
-                    has_error = True
-                    error = Box({"error": "Invalid custom mode passed " + str(suboperation)})
+                modenumber = 0
+                for custommode in suboperation.split(','):
+                    if PetDoorCustomMode.has_member(custommode.title()):
+                        customvalue = PetDoorCustomMode[custommode.title()].value
+                        modenumber += customvalue
+                        # if customvalue != 0:
+                        #     currentcustom = PetDoorCustomMode(device['Custom_Mode'] if 'Custom_Mode' in device else 0)
+                        #     # finalcustom = currentcustom | customvalue
+                    else:
+                        has_error = True
+                        error = Box({"error": "Invalid custom mode passed " + str(custommode)})
+
+                device.merge_update({'Custom_Mode': modenumber})
+                # pethubconfig['Devices'] = devices
+                print('Final Custom Mode',modenumber.to_bytes(3, 'big').hex())
+                message = message.replace("CM CM CM", modenumber.to_bytes(3, 'big').hex(' '))
 
             if "SS FF FF TT TT" in message:  # Update Curfews
                 log.debug('Updating Curfews')
@@ -189,17 +194,17 @@ def generatemessage(pethubconfig, hub, product_id, operation, **genmsg):
 
             if "CC CC CC CC CC CC CC" in message:  # Update Tag Provisioning
                 # Tag Offset
-                if 'offset' in genmsg:
-                    offset = (int(genmsg['offset']) * 7) + 91
+                if 'suboperation' in genmsg:
+                    offset = (int(genmsg['suboperation']) * 7) + 84
                     # print('tag offset', offset)
                     message = message.replace('II', f"{offset}")
                 else:
                     message = message.replace('II', '00')
                 # Tag to Hex
-                if 'tag' in genmsg:
+                if len(tag) > 0:
                     message = message.replace('CC CC CC CC CC CC CC', door_tag_to_hex(genmsg['tag']))
                 else:
-                    message = message.replace('CC CC CC CC CC CC CC', '00 00 00 00 00 00 07')
+                    message = message.replace('CC CC CC CC CC CC CC', '00 00 00 00 00 00 00')
 
 
             result = Box({PH_HUB_T + hub + "/messages/" + mac: buildmqttsendmessage(message)})
@@ -278,6 +283,20 @@ def generatemessage(pethubconfig, hub, product_id, operation, **genmsg):
             "Both":  "03",  # Zero both scale
         })
 
+        custom = Box({
+            "Disabled": "00",  # Disable Custom Mode
+            "Enabled": "01",   # Enable Custom Mode
+            "Metal": "02",     # Enable Metal Custom Mode
+        })
+        metalmode = Box({
+            "Disabled": "00",  # Disable Metal Custom Mode
+            "Enabled": "02",   # Enable Metal Custom Mode
+        })
+        doubletag = Box({
+            "Disabled": "01",  # Disable Double Tag Custom Mode
+            "Enabled": "02",   # Enable Double Tag Custom Mode
+        })
+
         operations = Box({
             "ACK":              {"msg": "127 00 00 ZZ ZZ TT TT TT TT SS 00 00",                      "desc": "Send acknowledge to data type", "validate": ackdatatype},
             "GET":              {"msg": "127 01 00 ZZ ZZ TT TT TT TT SS",                            "desc": "Get current state of data type", "validate": getdatatype},
@@ -300,6 +319,11 @@ def generatemessage(pethubconfig, hub, product_id, operation, **genmsg):
             "KEEPOUT":          {"msg": "127 11 00 ZZ ZZ TT TT TT TT 00 00 00 00 00 00 07 05 00 02",    "desc": "Keep pets out"},
             "LOCKED":           {"msg": "127 11 00 ZZ ZZ TT TT TT TT 00 00 00 00 00 00 07 04 00 02",    "desc": "Locked both way"},
             "CURFEWS":          {"msg": "127 12 00 ZZ ZZ TT TT TT TT 00 00 00 00 00 00 07 00 AA",       "desc": "Set Curfew"},
+            "DOUBLETAG":        {"msg": "127 09 00 ZZ ZZ TT TT TT TT 01 SS 00 00 00",                   "desc": "Set Custom Mode - Double Tag Mode", "validate": doubletag},
+            "EXTENDEDRANGE":    {"msg": "127 09 00 ZZ ZZ TT TT TT TT 04 SS 00 00 00",                   "desc": "Set Custom Mode - Extended Frequency", "validate": custom},
+            "NONSELECTIVE":     {"msg": "127 09 00 ZZ ZZ TT TT TT TT 05 SS 00 00 00",                   "desc": "Set Custom Mode - Non Selective Exit", "validate": custom},
+            "METALMODE":        {"msg": "127 09 00 ZZ ZZ TT TT TT TT 07 SS 00 00 00",                   "desc": "Set Custom Mode - Metal Mode", "validate": metalmode},
+            "FASTLOCK":         {"msg": "127 09 00 ZZ ZZ TT TT TT TT 08 SS 00 00 00",                   "desc": "Set Custom Mode - Fast Locking Mode", "validate": custom},
 
             # Poseidon
             "ADDTAG":           {"msg": "127 09 00 ZZ ZZ TT TT TT TT 0f 01 00 00 00",                    "desc": "Add Tag"},
@@ -405,14 +429,19 @@ def generatemessage(pethubconfig, hub, product_id, operation, **genmsg):
                 message = message.replace("AA", curfewmessage)  # Update the payload with the curfew message
 
             # Get Device Counter and update
-            devices = pethubconfig[DEV]
-            counter = devices[hub][mac]['Send_Counter'] + 1
-            if counter > 65534:
-                counter = 0
-            devices[hub][mac]['Send_Counter'] = counter
+            if operationupper == 'ACK':
+                counter = int(genmsg.get('counter', 0))
+            else:
+                devices = pethubconfig[DEV]
+                log.info('Generate Counter %s %s', hub, mac)
+                log.info(devices[hub][mac])
+                counter = devices[hub][mac]['Send_Counter'] + 1
+                if counter > 65534:
+                    counter = 0
+                devices[hub][mac]['Send_Counter'] = counter
+                pethubconfig[DEV] = devices
 
             message = message.replace('ZZ ZZ', hex_spaces(counter.to_bytes(2, 'little')))
-            pethubconfig[DEV] = devices
 
             # Update timestamp
             utctime = datetime.utcnow()  # Current timestamp in UTC

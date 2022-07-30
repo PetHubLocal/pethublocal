@@ -33,7 +33,8 @@ from .consts import (
     CFG,
     DEV,
     REINITDAYS,
-    MQTTSLEEP
+    MQTTSLEEP,
+    FIRMWAREVERSION
 )
 
 import logging

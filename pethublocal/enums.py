@@ -177,7 +177,7 @@ class PetDoorDirection(SureEnum):
     Inside              = 0x61     # Normal ingress
     Outside             = 0x62     # Normal egress
     Inside_Already      = 0x81     # Ingress if the pet door thought the pet was already inside
-    Outside_Error       = 0x82     # Not sure what caused this.. but I have it in a log
+    Outside_Already     = 0x82     # Door thinks pet was already outside
     Outside_UnknownTag  = 0xd3     # This along with pet 621 is when the pet leaves too quickly for the pet door to read it leaving
 
 
@@ -242,6 +242,8 @@ class Animal(SureEnum):
     alien        = 0
     cat          = 1
     dog          = 2
+    cow          = 3
+    robot        = 4
 
 
 class AnimalState(SureEnum):
@@ -302,20 +304,20 @@ class PetDoorCustomMode(SureFlag):
     Disabled = 0              # All custom modes disabled
     Nonselective = 0x1        # Custom Mode 1 - Non-selective Entry - Unlocks the door inbound so any animal can come in
     Rechargeables = 0x2       # Custom Mode 2 - Rechargeable Batteries so work with lower voltage from 1.2v Rechargeables vs 1.5v Alkaline
-    ThreeSeconds = 0x4        # Custom Mode 3 - Timid Pets - 3 Seconds delay before closing door
-    TenSeconds = 0x8          # Custom Mode 4 - Slower Locking - 10 Seconds delay before closing door
+    Threeseconds = 0x4        # Custom Mode 3 - Timid Pets - 3 Seconds delay before closing door
+    Tenseconds = 0x8          # Custom Mode 4 - Slower Locking - 10 Seconds delay before closing door
     Intruder = 0x10           # Custom Mode 5 - Intruder Mode - Lock outside locks when non-provisioned animal detected by sensor to prevent door being pulled open
-    OppositeCurfew = 0x20     # Custom Mode 6 - Opposite Curfew mode - Lock KeepOut rather than KeepIn
-    LockedCurfew = 0x40       # Custom Mode 7 - Fully Locking Curfew Mode - Locks both in and out locks when in curfew mode
-    MetalMode1 = 0x80         # Custom Mode 8 - Metal Interference - This mode will help with severe metal interference in an installation
-    MetalMode2 = 0x100        # Custom Mode 9 - Metal Interference - This mode will help with severe metal interference in an installation
-    ExtendedRange = 0x200     # Custom Mode 10 - Extended Mode - Extend frequency of scanning the tags
-    ExtendedIntruder = 0x400  # Custom Mode 11 - Extended Intruder Mode - Extended Intruder Mode - Registers presence of intruder animal trying to enter the house and closes outside lock to prevent door being pulled open for longer period
+    Oppositecurfew = 0x20     # Custom Mode 6 - Opposite Curfew mode - Lock KeepOut rather than KeepIn
+    Lockedcurfew = 0x40       # Custom Mode 7 - Fully Locking Curfew Mode - Locks both in and out locks when in curfew mode
+    Metalmode1 = 0x80         # Custom Mode 8 - Metal Interference - This mode will help with severe metal interference in an installation
+    Metalmode2 = 0x100        # Custom Mode 9 - Metal Interference - This mode will help with severe metal interference in an installation
+    Extendedrange = 0x200     # Custom Mode 10 - Extended Mode - Extend frequency of scanning the tags
+    Extendedintruder = 0x400  # Custom Mode 11 - Extended Intruder Mode - Extended Intruder Mode - Registers presence of intruder animal trying to enter the house and closes outside lock to prevent door being pulled open for longer period
     BIT12 = 0x800             # Bit12 - ?
-    DoubleChip1 = 0x1000      # Custom Mode 13 - Double Chip Operating Mode 1 - Allow animal with two tags interfering with each other to enter
-    DoubleChip2 = 0x2000      # Custom Mode 14 - Double Chip Operating Mode 2 - Allow animal with two tags interfering with each other to enter
-    DoubleChip3 = 0x4000      # Custom Mode 15 - Double Chip Operating Mode 3 - Allow animal with two tags interfering with each other to enter
-    ProximityTest = 0x8000    # Custom Mode 16 - Proximity Sensor Test - Test the proximity function of the door.
+    Doublechip1 = 0x1000      # Custom Mode 13 - Double Chip Operating Mode 1 - Allow animal with two tags interfering with each other to enter
+    Doublechip2 = 0x2000      # Custom Mode 14 - Double Chip Operating Mode 2 - Allow animal with two tags interfering with each other to enter
+    Doublechip3 = 0x4000      # Custom Mode 15 - Double Chip Operating Mode 3 - Allow animal with two tags interfering with each other to enter
+    Proximitytest = 0x8000    # Custom Mode 16 - Proximity Sensor Test - Test the proximity function of the door.
 
 
     """
