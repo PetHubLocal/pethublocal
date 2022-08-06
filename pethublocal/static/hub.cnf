@@ -1,0 +1,7 @@
+[ v3_req ]
+authorityKeyIdentifier=keyid:always
+subjectKeyIdentifier=hash
+subjectAltName=DNS:hub.api.surehub.io
+keyUsage=critical,digitalSignature,keyEncipherment
+extendedKeyUsage=serverAuth,clientAuth
+
