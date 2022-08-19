@@ -931,7 +931,7 @@ def ha_update_state(pethubconfig, *devicepet):
                         })
                     elif attrs.Bowl_Count == 1:  # One bowl
                         state_message.update({
-                            'Target': str(device.Bowl_Target[0]),
+                            'Target': str(attrs.Bowl_Target[0]),
                             'Weight': str(attrs.Bowl_Weight[0])
                         })
                     mqtt_messages.merge_update({PH_HA_T + devid + '/state': state_message.to_json()})
