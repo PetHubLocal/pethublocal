@@ -1008,7 +1008,7 @@ def parse_mqtt_message(pethubconfig, mqtt_topic, mqtt_message):
                                     animals.append(pets[tag]['Name'])  # Add name to Payload
                                     # Update config with current state
                                     if 'PetMovement' in mqttmessage.Operation:
-                                        DeviceMac = str(mqttmessage.Update_Item[0])[13:30]
+                                        DeviceMac = str(mqtt_topic_split[-1])
                                         pets[tag]['Activity'] = {
                                             "Where": mqttmessage.Direction,
                                             "Time": timestamp_now(),
