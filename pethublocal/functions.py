@@ -680,7 +680,7 @@ def start_to_pethubconfig(config, data):
             if 'activity' in pet.status:
                 loc = ['', 'Inside', 'Outside']
                 location = loc[pet.status.activity.where]
-                petresult.merge_update({'Activity': {'Where': location, 'Time': pet.status.activity.since}})
+                petresult.merge_update({'Activity': {'Where': location, 'Time': pet.status.activity.since, 'Update_Mac':'0'}})
             if 'feeding' in pet.status:
                 petresult.merge_update({'Feeding': {
                     'Change': pet.status.feeding.change, 'Time': pet.status.feeding.at}})
@@ -950,6 +950,8 @@ def ha_update_state(pethubconfig, *devicepet):
             pet_message = Box({})
             if 'Activity' in attrs:
                 pet_message.merge_update({"State": attrs.Activity.Where})
+                pet_message.merge_update({"Time": attrs.Activity.Time})
+                pet_message.merge_update({"Update_Mac": attrs.Activity.Update_Mac})
             else:
                 pet_message.merge_update({"State": "NoDoor"})
             if 'Feeding' in attrs:
@@ -1006,9 +1008,11 @@ def parse_mqtt_message(pethubconfig, mqtt_topic, mqtt_message):
                                     animals.append(pets[tag]['Name'])  # Add name to Payload
                                     # Update config with current state
                                     if 'PetMovement' in mqttmessage.Operation:
+                                        DeviceMac = str(mqtt_topic_split[-1])
                                         pets[tag]['Activity'] = {
                                             "Where": mqttmessage.Direction,
-                                            "Time": timestamp_now()}
+                                            "Time": timestamp_now(),
+                                            "Update_Mac": DeviceMac}
                                     if 'Feed' in mqttmessage.Operation:
                                         pets[tag]['Feeding'] = {
                                             "Change": mqttmessage.Delta,
