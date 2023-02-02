@@ -1277,11 +1277,10 @@ def build_firmware(xor_key, serial_number):
 def update_watchdog():
     global LastMessageFromHub
     LastMessageFromHub = datetime.utcnow()    # Init Watchdog timestamp
-    log.debug('Watchdog timer resetted')
+    log.debug('Watchdog timer was reset')
 
 def get_watchdog():
     global LastMessageFromHub
     TimeDifference = datetime.utcnow() - LastMessageFromHub
-    SecDifference = TimeDifference.total_seconds()
     return TimeDifference.seconds
 
