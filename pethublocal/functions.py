@@ -30,6 +30,7 @@ from .enums import *
 # Disable annoying urllib HTTPS Warnings
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
+LastMessageFromHub = datetime.utcnow()
 
 def external_dns_query(host, internal=False):
     """
@@ -990,6 +991,7 @@ def parse_mqtt_message(pethubconfig, mqtt_topic, mqtt_message):
             message_split = mqtt_message.split()
             if message_split[1] != "1000":  # Don't process command messages that we have generated
                 log.info('HUB: Inbound Message Topic: "%s" Message: "%s"', mqtt_topic, mqtt_message)
+                update_watchdog();		# Update watchdog timestamp
                 mqtt_messages = parse_hub(pethubconfig, mqtt_topic, mqtt_message)
                 if 'message' in mqtt_messages:
                     for mqttmessage in mqtt_messages.message:
@@ -1268,3 +1270,18 @@ def build_firmware(xor_key, serial_number):
         log.info('Firmware: Custom firmware built')
     else:
         log.info('Firmware %s already exists', firmwares)
+
+
+
+
+def update_watchdog():
+    global LastMessageFromHub
+    LastMessageFromHub = datetime.utcnow()    # Init Watchdog timestamp
+    log.debug('Watchdog timer resetted')
+
+def get_watchdog():
+    global LastMessageFromHub
+    TimeDifference = datetime.utcnow() - LastMessageFromHub
+    SecDifference = TimeDifference.total_seconds()
+    return TimeDifference.seconds
+
