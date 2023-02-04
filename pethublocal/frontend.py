@@ -3,6 +3,7 @@
    Pet Hub Local frontend for serving http, https and mqtt message translation
    Copyright (c) 2022, Peter Lambrechtsen (peter@crypt.nz)
 """
+
 import calendar
 import os
 import sys
@@ -19,9 +20,11 @@ from multidict import MultiDict
 from aiohttp import web
 import socketio
 import json
+import os
+
 
 from .functions import config_load, config_save, download_credentials, download_firmware, \
-    parse_mqtt_message, ha_init_entities, ha_update_state, json_print
+    parse_mqtt_message, ha_init_entities, ha_update_state, json_print, update_watchdog, get_watchdog
 from .generate import generatemessage
 from . import log
 from .consts import (
@@ -45,6 +48,7 @@ logging.basicConfig(
 )
 
 sio = socketio.AsyncServer(async_mode='aiohttp', async_handlers=True)
+
 
 async def credentials(request):
     """
@@ -194,6 +198,7 @@ async def start_tasks(app):
     loop = asyncio.get_event_loop()
     loop.create_task(mqtt_start(app))
     loop.create_task(https_app(app['pethubconfig']))
+    loop.create_task(hub_watchdog(app))
 
 
 async def mqtt_start(app):
@@ -293,6 +298,24 @@ async def mqtt_start(app):
             log.info(f'Error "{error}". Reconnecting in {reconnect_interval} seconds.')
         finally:
             await asyncio.sleep(reconnect_interval)
+
+
+async def hub_watchdog(app):
+    check_interval = 60  # [seconds]
+    log_count = 10
+    update_watchdog()		# Init Watchdog timestamp
+    while True:
+      seconds = get_watchdog()
+      minutes = seconds / 60
+      log_count += 1
+      if log_count >= 5:
+        log.debug('Watchdog status - Last Hub message was %d seconds (%d minutes) ago',seconds,minutes)
+        log_count = 0
+      if minutes >= 70 :
+        os.system("systemctl stop mosquitto && rm -f /var/lib/mosquitto/mosquitto.db && systemctl start mosquitto")
+        log.info('Hub watchdog triggered, no message since %d minutes! Restarted mosquitto and deleted persistent data',minutes)
+        update_watchdog()		# Reload Watchdog timer with current time
+      await asyncio.sleep(check_interval)
 
 
 async def queue_mqtt(client, app):
