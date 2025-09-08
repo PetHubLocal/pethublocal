@@ -1,0 +1,111 @@
+{
+    "Config": {
+        "Deployment": "Cloud",
+        "Timezone": "Local",
+        "Last_HA_Init": 1753769954,
+        "Get_State": true,
+        "Last_Updated": "2025-07-30 06:43:47",
+        "Cloud": {
+            "LoggedIn": true,
+            "Username": "yourEmail@gmail.com",
+            "Password": "yourPetHubPassword",
+            "device_id": "", // Appears to get populated when you sign into the cloud using the pethublocal setup command.
+            "Token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkZha2UgVXNlciIsImlhdCI6MTcyMjI5NzYwMCwiZXhwIjoxNzIyMzAxMjAwfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c",
+            "StartJSON": "start-20250729-031958.json"
+        },
+        "Web": {
+            "Host": "0.0.0.0",
+            "HTTPPort": 80,
+            "HTTPSPort": 443,
+            "Cert": "hub.pem",
+            "CertKey": "hub.key"
+        },
+        "MQTT": {
+            "Host": "192.168.1.100", // IP address of your MQTT Broker, this might be 127.0.0.1 if you are running the broker on the same machine as PetHubLocal.
+            "ClientUsername": "pethublocal",// If your MQTT broker requires a username and password, otherwise delete these.
+            "ClientPassword": "pethublocal"
+        },
+        "Firmware": {
+            "Cache": true,
+            "Force_Download": false
+        }
+    },
+    "Devices": {
+        "H002-0077777": { // Update this with the number on the underside of your hub
+            "Hub": {
+                "Name": "Main",
+                "Product_Id": 1,
+                "Serial_Number": "H002-0077777", // Update this with the number on the underside of your hub
+                "Mac_Address": "0000A47B3C19F2DE", // This is the MAC address of your hub. Don't get confused, it's the Ethernet MAC address on the underside, not the MiWi one for the radio that talks to the cat flap.
+                "Updated_At": "2025-07-29T03:08:28+00:00",
+                "Index": "Hub",
+                "Led_Mode": 1,
+                "Pairing_Mode": 0,
+                "State": "Online",
+                "Device": {
+                    "Hardware": "3",
+                    "Firmware": "2.43"
+                },
+                "Uptime": "1260",
+                "Main_Version": "58",
+                "UUID": "A random UUID (find an online generator)",
+                "Client_Cert": "", // I'm sorry, for me this was updated after I connected my V1 hub up to PetHubLocal. Seems to be hub specific. If you have a V1 hub on the older firmware, you can probably run through the setup and have it populate it.
+                "Reconnects": "1"
+            },
+            "": { // This is the MAC address for the pet door (unlike the HUB, this is the radio MAC). I was able to get this by sniffing the traffic between a new hub and the pet door using Wireshark and a CC2531. Saved me hooking older hub up to internet and risking a firmware update.
+                "Name": "Main Door",
+                "Product_Id": 3,
+                "Index": 0,
+                "Mac_Address": "", // Same MAC as above.
+                "Updated_At": "2025-07-29T03:17:59+00:00",
+                "Last_Device_Update": 1753769955,
+                "Fast_Polling": true,
+                "Curfew_Enabled": false,
+                "Curfews": "12:01-12:02",
+                "Locking_Mode": 0,
+                "State": "Online",
+                "Learn_Mode": false,
+                "Battery": "6.2025",
+                "BatteryADC": "182",
+                "Lcd": {
+                    "Hardware": "1.0",
+                    "Firmware": "1.0"
+                },
+                "Rf": {
+                    "Hardware": "4.0",
+                    "Firmware": "0.21"
+                },
+                "Device": {
+                    "Hardware": "1.2",
+                    "Firmware": "1.1"
+                },
+                "Device_Rssi": -55,
+                "Hub_Rssi": -70,
+                "Tags": {
+                    "0": {
+                        "Tag": "999.000099999999", // Number of the chip on the first pet registered on the door. I found it in their little medical booklet.
+                        "Profile": 2
+                    },
+                    "1": {
+                        "Tag": "999.000099999998", // Same as above, but for the second pet.
+                        "Profile": 2
+                    }
+                },
+                "Main_Version": "9",
+                "Last_Heard": "436535652",
+                "Locked_Out_State": "Normal"
+            }
+        }
+    },
+    "Pets": {
+        "999.000099999999": {
+            "Name": "Cat1",
+            "Species": 1
+            }
+        },
+        "999.000099999998": {
+            "Name": "Cat2",
+            "Species": 1
+        }
+    }
+}

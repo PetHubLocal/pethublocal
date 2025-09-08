@@ -111,6 +111,9 @@ def hex_byte(value):
     """ Convert to byte / two digit hex """
     return f"{int(value):02x}"
 
+def get_enabled_custom_modes(custom_mode: int) -> list[str]:
+    """ Get a list of enabled custom modes from the Pet Door custom mode bitmask. """
+    return [mode.name for mode in PetDoorCustomMode if mode.value & custom_mode]
 
 # Main Parsing Functions
 def parse_hub_frame(pethubrecord, offset, length):
@@ -596,24 +599,29 @@ def parse_door_frame(pethubrecord, hub, device_item, offset, length):
         log.debug("PETDOOR: Register 61-63 - Custom Mode %s", str(message_range))
         operation.append("CustomMode")
         custom_mode = int.from_bytes(registers[61:64], byteorder='big')
-        frame_response.CustomMode = str(custom_mode)
-        frame_response.CustomModes = PetDoorCustomMode(custom_mode).string_array()
+        enabled_modes = get_enabled_custom_modes(custom_mode)
+        log.debug("Enabled Custom Modes: %s", enabled_modes)
+        frame_response.CustomMode = str(custom_mode)    # Store the raw custom mode value as an int
+        frame_response.CustomModes = enabled_modes      # Store the enabled custom modes as a list of human readable strings
         pethubrecord['Custom_Mode'] = str(custom_mode)
-        pethubrecord['Custom_Modes'] = str(frame_response.CustomModes)
-        if custom_mode > 0:
-            update_state = True
+        pethubrecord['Custom_Modes'] = str(enabled_modes)
+        update_state = True
     if offset in range(91, 309):  # Provisioned tags
         log.debug("PETDOOR: Register 91-309 - Provisioned Tags %s", str(message_range))
         operation.append("Tag")
-        frame_response.TagOffset = str(round((int(offset) - 84) / 7))  # Calculate the tag offset number
-        tag = door_hex_to_tag(registers[offset:offset+7])                  # Calculate tag Number
+        frame_response.TagOffset = str(round((int(offset) - 84) / 7) -1)  # Calculate the tag offset number (0 indexed. This wasn't originally the case, but it matches what's on line 634)
+        tag = door_hex_to_tag(registers[offset:offset+7])                 # Calculate tag Number
         frame_response.Tag = [tag]
         if tag != 'Empty':
+            log.info("Found tag in door message with value of %s at offset %s", tag, frame_response.TagOffset)
             if frame_response.TagOffset in pethubrecord['Tags']:
+                log.info("Matches existing offset")
                 if not pethubrecord['Tags'][frame_response.TagOffset]['Tag'] == tag:
+                    log.info("Updating tag %s at offset %s", tag, frame_response.TagOffset)
                     pethubrecord['Tags'][frame_response.TagOffset] = {"Tag": tag}
                     update_state = True
             else:
+                log.info("Adding new tag %s at offset %s", tag, frame_response.TagOffset)
                 pethubrecord['Tags'][frame_response.TagOffset] = {"Tag": tag}
                 update_state = True
                 New_Tag = True

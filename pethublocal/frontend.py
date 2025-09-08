@@ -22,6 +22,8 @@ import socketio
 import json
 import os
 
+from pethublocal.enums import PetDoorDirection
+
 
 from .functions import config_load, config_save, download_credentials, download_firmware, \
     parse_mqtt_message, ha_init_entities, ha_update_state, json_print, update_watchdog, get_watchdog
@@ -39,10 +41,10 @@ from .consts import (
     MQTTSLEEP,
     FIRMWAREVERSION
 )
+from importlib.resources import files
 
 import logging
 from logging.handlers import TimedRotatingFileHandler
-import pkg_resources
 logging.basicConfig(
     level=LOGLEVEL,
 )
@@ -118,9 +120,9 @@ async def https_app(pet_hub_config):
     cert = config['Web']['Cert']
     cert_key = config['Web']['CertKey']
     if not os.path.isfile(cert):
-        package_dir = pkg_resources.resource_filename('pethublocal', "static")
-        cert = package_dir + '/' + cert
-        cert_key = package_dir + '/' + cert_key
+        package_dir = files("pethublocal") / "static"
+        cert = str(package_dir / cert)
+        cert_key = str(package_dir / cert_key)
     ssl_context.load_cert_chain(cert, cert_key)
     app_s = web.Application()
     app_s['pethubconfig'] = pet_hub_config
@@ -199,6 +201,7 @@ async def start_tasks(app):
     loop.create_task(mqtt_start(app))
     loop.create_task(https_app(app['pethubconfig']))
     loop.create_task(hub_watchdog(app))
+    loop.create_task(clear_lookedin_state(app))
 
 
 async def mqtt_start(app):
@@ -225,6 +228,7 @@ async def mqtt_start(app):
                         if mqtt_config['port'] == 8883:
                             mqtt_config['tls_context'] = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
                     client = Client(**mqtt_config)
+                    app['mqtt_client'] = client
                 else:
                     log.info('MQTT Host missing from config')
                     sys.exit(1)
@@ -318,6 +322,53 @@ async def hub_watchdog(app):
       await asyncio.sleep(check_interval)
 
 
+# Monitor the LookedIn state of pets
+# If a pet is in the LookedIn state for more than 20 seconds, reset it to Outside
+# This helps to ensure that Home Assistant gets nice updates each time they look in.
+async def clear_lookedin_state(app):
+    check_interval = 10  # [seconds]
+    state_expiration = 30 # [seconds]
+    client = app.get('mqtt_client')
+
+    while True:
+        should_update_ha = False
+        pets = app['pethubconfig'].get('Pets', [])
+        for pet_id, pet in pets.items():
+            activity = pet.get('Activity', {})
+            where = activity.get('Where')
+            time_str = activity.get('Time')
+            if where == PetDoorDirection.Outside_LookedIn.name and time_str:
+                try:
+                    activity_time = datetime.strptime(time_str, "%Y-%m-%d %H:%M:%S")
+                    now = datetime.now(timezone.utc)
+                    elapsed = (now - activity_time.replace(tzinfo=timezone.utc)).total_seconds()
+                    if elapsed > state_expiration:
+                        log.info(f"Pet {pet_id} has been in LookedIn state for {elapsed} seconds, resetting to Outside")
+                        activity['Where'] = PetDoorDirection.Outside.name
+                        activity['Time'] = now.strftime("%Y-%m-%d %H:%M:%S")
+                        activity['Update_Mac'] = "PetHubLocal"
+                        pet['Activity'] = activity
+                        should_update_ha = True
+                except Exception as e:
+                    log.warning(f"Could not parse activity time '{time_str}': {e}")
+
+        config_save(app['pethubconfig'])
+
+        if should_update_ha:
+            log.info("Updating Home Assistant with cleared LookedIn states")
+            if client:
+                ha_init_state = ha_update_state(app['pethubconfig'])
+                for topic, message in ha_init_state.items():
+                    log.debug('HA_INIT: Pet Topic:%s Message:%s', topic, message)
+                    await client.publish(topic, message, qos=0, retain=True)
+                    await sleep(MQTTSLEEP)  # Sleep as HA doesn't like getting a lot of messages at once
+                app['pethubconfig'][CFG]['Last_HA_Init'] = calendar.timegm(datetime.utcnow().timetuple())
+            else:
+                log.warning("MQTT client not available, cannot update Home Assistant")
+        
+        await asyncio.sleep(check_interval)
+
+
 async def queue_mqtt(client, app):
     log.info("Client: Start")
     client_sio = socketio.AsyncClient()
@@ -357,7 +408,6 @@ async def parse_message(client, app, messages):
 
         if message.topic.startswith('pethub/in'):
             print('emit message', message.payload.decode())
-            # await sio.emit('web_state', data=message.payload.decode(), broadcast=True, include_self=False)
 
 
 async def cancel_tasks(tasks):
@@ -418,7 +468,7 @@ def serve_pet_hub():
     app.router.add_post('/api/firmware', firmware)
     app.router.add_get('/pethubconfig', pethubconfig)
     app.router.add_route('*', '/', root_handler)
-    app.router.add_static('/', pkg_resources.resource_filename('pethublocal', "static"))
+    app.router.add_static('/', str(files("pethublocal") / "static"))
     app.on_startup.append(start_tasks)
     log.info("Starting HTTP Server")
     web.run_app(

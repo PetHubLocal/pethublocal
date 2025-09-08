@@ -2,6 +2,7 @@
  Pet Hub Shared functions
  Copyright (c) 2022, Peter Lambrechtsen (peter@crypt.nz)
 """
+import ast
 from datetime import datetime, timedelta
 import json
 import os
@@ -15,7 +16,6 @@ import dns.resolver
 import sys
 import codecs
 import urllib3
-import pkg_resources
 
 from pygments import highlight
 from pygments.lexers import JsonLexer
@@ -26,6 +26,7 @@ from .message import parse_hub
 from .consts import *
 from . import log
 from .enums import *
+from importlib.resources import files
 
 # Disable annoying urllib HTTPS Warnings
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -58,6 +59,12 @@ def valid_hub_mac(mac_address):
     """ Regex check the 802.15.4 MiWi Mac Address is valid """
     return re.match('^0000[0-9A-F]{12}$', mac_address)
 
+def pascal_to_spaced(text):
+    """
+    Convert PascalCase string to spaced string.
+    Example: 'KeepIn' -> 'Keep In'
+    """
+    return re.sub(r'(?<!^)([A-Z])', r' \1', text)
 
 def download_firmware_record(surehubioip, serialnumber, bootloader, page):
     """
@@ -361,8 +368,12 @@ def config_load(setup=False, force=False):
                         start = Box.from_json(filename=config.Config.Cloud.StartJSON)
                 if 'StartJSON' not in config.Config.Cloud:
                     start.merge_update(download_start(config))
-                if len(start) > 5:
-                    # log.info('Start downloaded, saving base config %s', start.to_json())
+                if len(start.data) > 5:
+                    log.info('Start downloaded, saving base config %s', start.to_json())
+                    continue_setup = input('Continue with setup using this start file? If you need to make changes to it before applying to the config, now is the time to do so. Press Y to continue or N to make changes')
+                    if len(continue_setup) > 0 and continue_setup[0].upper() == 'N':
+                        log.info('Exiting setup, please edit the start file %s and re-run', config.Config.Cloud.StartJSON)
+                        sys.exit(0)
                     config.merge_update(start_to_pethubconfig(config, start))
                     config_save(config)
                     log.info('Start parsed and saved to config')
@@ -377,19 +388,31 @@ def config_load(setup=False, force=False):
                                     firmware = str(key.Device.Firmware)
                                     log.info('Downloading Current Firmware for %s', serial_number)
                                     log.info(download_firmware(serial_number, force))
-                                    if firmware != "2.43":
-                                        log.info("Your device has been upgraded to version %s and since it isn't running 2.43 this version "
-                                                 "the Hub now checks the server certificate is legitimate before connecting (boo! :( ) "
-                                                 "so you will need to downgrade the hub to 2.43 which for the moment is easy as holding "
-                                                 "the reset button underneath the hub when the DNS is poisoned to point to PetHubLocal (Yay!)", firmware)
-                                        # Find the XOR Key and Long Serial aka Certificate Password based off firmware
-                                        xor_key, long_serial = find_firmware_xor_key(serial_number, BOOTLOADER)
-                                        config.merge_update({'Devices': {hubs:{dev:{
-                                            'XOR_Key': xor_key,
-                                            'Long_Serial': long_serial
-                                        }}}})
-                                        # Build specific 2.43 firmware that doesn't check the SSL Cert for this hub using XOR key
-                                        build_firmware(xor_key, serial_number)
+                                    # Find the XOR Key and Long Serial aka Certificate Password based off firmware
+                                    xor_key, long_serial = find_firmware_xor_key(serial_number, BOOTLOADER)
+                                    log.info('XOR Key: %s Long Serial: %s', xor_key, long_serial)
+                                    config.merge_update({'Devices': {hubs:{dev:{
+                                        'XOR_Key': xor_key,
+                                        'Long_Serial': long_serial
+                                    }}}})
+                                    try:
+                                        before_decimal = int(firmware.split('.')[0])
+                                        after_decimal = int(firmware.split('.')[1])
+                                        if (before_decimal == 2 and after_decimal > 201) or before_decimal > 2:
+                                            log.error("I'm sorry to say that you are running version %s. "
+                                                      "firmware after version 2.201 does not work with this project thanks to SurePet.\n"
+                                                      "Whatsmore, there is currently no way to downgrade the firmware from this level.", firmware)
+                                            sys.exit(1)
+                                        if before_decimal == 2 and after_decimal > 43:
+                                            log.info("Your device has been upgraded to version %s. Since it isn't running 2.43 "
+                                                     "the Hub now checks the server certificate is legitimate before connecting (boo! :( ) \n"
+                                                     "Fortunately, your firmware DOES support downgrading to 2.43 which for the moment is easy as holding "
+                                                     "the reset button underneath the hub when the DNS is poisoned to point to PetHubLocal (Yay!)", firmware)
+                                            # Build specific 2.43 firmware that doesn't check the SSL Cert for this hub using XOR key
+                                            build_firmware(xor_key, serial_number)
+                                    except (IndexError, ValueError):
+                                        log.info(f"Could not parse firmware version: {firmware}")
+                                        sys.exit(1)
 
                                     log.info('Downloading Credentials for %s MAC: %s Firmware: %s', serial_number, mac_address, firmware)
                                     log.info(download_credentials(key, serial_number, mac_address, firmware))
@@ -400,6 +423,14 @@ def config_load(setup=False, force=False):
                         if len(mqtt_broker_ip) > 0:
                             config.merge_update({'Config':{'MQTT':{'Host': mqtt_broker_ip}}})
                             log.info('Broker IP Updated to: %s', mqtt_broker_ip)
+                        mqtt_custom_credentials = input('Does your MQTT Broker need a username and password to connect on 1883? Y/N ')
+                        if len(mqtt_custom_credentials) > 0 and mqtt_custom_credentials[0].upper() == 'Y':
+                            mqtt_client_username = input('MQTT Client Username:')
+                            mqtt_client_password = input('MQTT Client Password:')
+                            if len(mqtt_broker_ip) > 0:
+                                config.merge_update({'Config':{'MQTT':{'ClientUsername': mqtt_client_username}}})
+                                config.merge_update({'Config':{'MQTT':{'ClientPassword': mqtt_client_password}}})
+                                log.info('Broker Username and password updated to: %s and %s', mqtt_client_username, mqtt_client_password)
                     else:
                         config.merge_update({'Config': {'MQTT': {'Host': '127.0.0.1'}}})
                     config_save(config)
@@ -452,13 +483,24 @@ def config_addon(username, password):
                             'XOR_Key': xor_key,
                             'Long_Serial': long_serial
                         }}}})
-                        if firmware != "2.43":
-                            log.info("Your device has been upgraded to version %s and since it isn't running 2.43 this version "
-                                     "the Hub now checks the server certificate is legitimate before connecting (boo! :( ) "
-                                     "so you will need to downgrade the hub to 2.43 which for the moment is easy as holding "
-                                     "the reset button underneath the hub when the DNS is poisoned to point to PetHubLocal (Yay!)", firmware)
-                            # Build specific 2.43 firmware that doesn't check the SSL Cert for this hub using XOR key
-                            build_firmware(xor_key, serial_number)
+                        try:
+                            before_decimal = int(firmware.split('.')[0])
+                            after_decimal = int(firmware.split('.')[1])
+                            if (before_decimal == 2 and after_decimal > 201) or before_decimal > 2:
+                                log.error("I'm sorry to say that you are running version %s. "
+                                          "firmware after version 2.201 does not work with this project thanks to SurePet.\n"
+                                          "Whatsmore, there is currently no way to downgrade the firmware from this level.", firmware)
+                                sys.exit(1)
+                            if before_decimal == 2 and after_decimal > 43:
+                                log.info("Your device has been upgraded to version %s. Since it isn't running 2.43 "
+                                         "the Hub now checks the server certificate is legitimate before connecting (boo! :( )\n"
+                                         "Fortunately, your firmware DOES support downgrading to 2.43 which for the moment is easy as holding "
+                                         "the reset button underneath the hub when the DNS is poisoned to point to PetHubLocal (Yay!)", firmware)
+                                # Build specific 2.43 firmware that doesn't check the SSL Cert for this hub using XOR key
+                                build_firmware(xor_key, serial_number)
+                        except (IndexError, ValueError):
+                            log.info(f"Could not parse firmware version: {firmware}")
+                            sys.exit(1)
                         log.info('Downloading Credentials for %s MAC: %s Firmware: %s', serial_number, mac_address, firmware)
                         log.info(download_credentials(key, serial_number, mac_address, firmware))
 
@@ -520,6 +562,16 @@ def start_to_pethubconfig(config, data):
     # Tags box
     tags = data.tags
 
+    if data.devices is None or len(data.devices) == 0:
+        log.error("No devices found in payload from SurePetCare. Make sure you have a hub and accessory registered to your account. \n"
+                  "You may not wish to connect your V1 hub to the internet for this, it may result in a firmware upgrade that breaks this project. \n"
+                  "My only suggestion is to use a V2 hub and temporarily pair it with your accessories. That will generate the correct config in the cloud. \n"
+                  "After that, come back here and start the cloud set up again. Select to download a new start file. When given the option, exit the set up. "
+                  "Then, manually update the start.json file to replace the references to the V2 hub with the V1 hub. Essentially pretending this was what was pulled from the cloud. \n"
+                  "Then, come back once more and run the PetHubLocal setup. This time, say to NOT download a new start file and the installer will use the one you just updated. \n"
+                  "In particular, the serial number and MAC address of the V1 hub will need updating in the start file. There may be other differences, go through it line by line.")
+        sys.exit(1)
+
     # Parent Serial Number, assumption this is always the first device serial number.
     parent_serial = data.devices[0].serial_number
     for device in data.devices:
@@ -552,7 +604,7 @@ def start_to_pethubconfig(config, data):
                 if key in control_fields:
                     device_result.merge_update({key.title(): val})
             if 'version' in device:
-                device_result.merge_update({'Main_Version': str(base64.b64decode(device.version).decode('utf-8'))})
+                device_result.merge_update({'Main_Version': str(device.version)})
 
             # Pet Door or Cat Flap
             if device.product_id in [3, 6]:
@@ -700,7 +752,7 @@ def ha_init_entities(pethubconfig):
     for hub, devices in Box(pethubconfig['Devices']).items():
         for device, attrs in devices.items():  # Devices
             # Device ID Value, either _Hub or _mac_address if it's not a hub
-            if attrs.Product_Id == 1:  # Hub
+            if attrs.Product_Id == EntityType.Hub:
                 devid = hub + '_Hub'
             else:
                 devid = hub + '_' + attrs.Mac_Address
@@ -715,7 +767,7 @@ def ha_init_entities(pethubconfig):
             })
 
             # Create Battery sensor apart from hub as hubs don't have a battery
-            if attrs.Product_Id != 1:
+            if attrs.Product_Id != EntityType.Hub:
                 config_message = Box({
                     'name': attrs.Name + ' Battery',
                     'ic': 'mdi:battery',
@@ -729,16 +781,16 @@ def ha_init_entities(pethubconfig):
                 mqtt_messages.merge_update({HA_SENSOR + devid + '_battery/config': config_message.to_json()})
 
             # Device parameters
-            if attrs.Product_Id == 1:
+            if attrs.Product_Id == EntityType.Hub:
                 icon = 'mdi:radio-tower'
-            elif attrs.Product_Id in [3, 6]:
+            elif attrs.Product_Id in [EntityType.PetDoor, EntityType.CatFlap]:
                 icon = 'mdi:door'
                 # Switches for Doors
                 lockstate = ['KeepIn', 'KeepOut', 'Curfew']
                 for key in lockstate:
                     devidkey = devid + '_' + key.lower()
                     config_message = Box({
-                        'name': attrs.Name + ' ' + key,
+                        'name': attrs.Name + ' ' + pascal_to_spaced(key),
                         'ic': icon,
                         'uniq_id': devidkey,
                         'stat_t': PH_HA_T + devid + '/state',
@@ -752,9 +804,45 @@ def ha_init_entities(pethubconfig):
                     mqtt_messages.merge_update({
                         HA_SWITCH + devidkey + '/config': config_message.to_json()
                     })
-            elif attrs.Product_Id == 4:
+                customModes = [
+                    {"key": PetDoorCustomMode.NonSelective.name, "custIcon": "mdi:door-sliding-open"},
+                    {"key": PetDoorCustomMode.Rechargeables.name, "custIcon": "mdi:battery"},
+                    {"key": PetDoorCustomMode.ThreeSeconds.name, "custIcon": "mdi:timer-3"},
+                    {"key": PetDoorCustomMode.TenSeconds.name, "custIcon": "mdi:timer-10"},
+                    {"key": PetDoorCustomMode.Intruder.name, "custIcon": "mdi:shark-off"},
+                    {"key": PetDoorCustomMode.OppositeCurfew.name, "custIcon": "mdi:clock-end"},
+                    {"key": PetDoorCustomMode.LockedCurfew.name, "custIcon": "mdi:lock-clock"},
+                    {"key": PetDoorCustomMode.MetalMode1.name, "custIcon": "mdi:shield"},
+                    {"key": PetDoorCustomMode.MetalMode2.name, "custIcon": "mdi:shield-outline"},
+                    {"key": PetDoorCustomMode.ExtendedRange.name, "custIcon": "mdi:signal"},
+                    {"key": PetDoorCustomMode.ExtendedIntruder.name, "custIcon": "mdi:shark-off"},
+                    {"key": PetDoorCustomMode.DoubleChip1.name, "custIcon": "mdi:chip"},
+                    {"key": PetDoorCustomMode.DoubleChip2.name, "custIcon": "mdi:chip"},
+                    {"key": PetDoorCustomMode.DoubleChip3.name, "custIcon": "mdi:chip"},
+                    {"key": PetDoorCustomMode.ProximityTest.name, "custIcon": "mdi:radio-tower"}
+                ]
+                for mode in customModes:
+                    key = mode["key"]
+                    custIcon = mode["custIcon"]
+                    devidkey = devid + '_' + key.lower()
+                    config_message = Box({
+                        'name': attrs.Name + ' Custom ' + pascal_to_spaced(key),
+                        'ic': custIcon,
+                        'uniq_id': devidkey,
+                        'stat_t': PH_HA_T + devid + '/state',
+                        'val_tpl': '{{value_json.Custom_Mode}}',
+                        'json_attr_t': PH_HA_T + devid + '/state',
+                        'cmd_t': PH_HA_T + devid + '/custom_mode',
+                        'avty_t': PH_HA_T + devid + '/state',
+                        'avty_tpl': '{{value_json.Availability}}',
+                        'device': device_config
+                    })
+                    mqtt_messages.merge_update({
+                        HA_SWITCH + devidkey + '/config': config_message.to_json()
+                    })
+            elif attrs.Product_Id == EntityType.Feeder:
                 icon = 'mdi:bowl'
-            elif attrs.Product_Id == 8:
+            elif attrs.Product_Id == EntityType.Poseidon:
                 icon = 'mdi:glass-mug'
             else:
                 icon = 'mdi:alien'
@@ -772,7 +860,7 @@ def ha_init_entities(pethubconfig):
             })
             mqtt_messages.merge_update({HA_SENSOR + devid + '/config': config_message.to_json()})
 
-            if attrs.Product_Id in [4, 8]:
+            if attrs.Product_Id in [EntityType.Feeder, EntityType.Poseidon]:
                 # log.debug('HAINIT: %s - Add bowls %s', EntityType(attrs.Product_Id).Name, str(attrs.bowlcount))
                 # Add separate sensors for the weights
                 bowls = {
@@ -870,12 +958,12 @@ def ha_update_state(pethubconfig, *devicepet):
             if (not devicepet) or hub+'_'+device == devicepet[0]:
                 # log.debug('HA: Hub %s Device %s', hub, device)
                 # Device ID Value, either _Hub or _mac_address if it's not a hub
-                if attrs.Product_Id == 1:  # Hub
+                if attrs.Product_Id == EntityType.Hub:
                     devid = hub + '_Hub'
                 else:
                     devid = hub + '_' + attrs['Mac_Address']
 
-                if attrs.Product_Id == 1:  # Hub
+                if attrs.Product_Id == EntityType.Hub:  # Hub
                     state_message = Box({
                         'Availability': attrs.State.lower() if 'State' in attrs else 'offline',
                         'State': attrs.State if 'State' in attrs else 'Offline',
@@ -891,31 +979,42 @@ def ha_update_state(pethubconfig, *devicepet):
                     #     state_message[devs.title()] = version.device[devs]
                     mqtt_messages.merge_update({PH_HA_T + devid + '/state': state_message.to_json()})
 
-                if attrs.Product_Id in [3, 6]:  # Pet Door or Cat Flap
+                if attrs.Product_Id in [EntityType.PetDoor, EntityType.CatFlap]:  # Pet Door or Cat Flap
                     # Curfew state:
                     # Handling the dumb way that the Cat Flap has a curfew mode to toggle between
                     # enabled and the pet door goes to locking mode 4 for curfew.
-                    if attrs.Product_Id == 3 and attrs.Locking_Mode == 4:
+                    if attrs.Product_Id == EntityType.PetDoor and attrs.Locking_Mode == LockState.CURFEW:
                         curfew = True
-                    elif attrs.Product_Id == 6 and attrs.Curfew_Enabled == 1:
+                    elif attrs.Product_Id == EntityType.CatFlap and attrs.Curfew_Enabled == 1:
                         curfew = True
                     else:
                         curfew = False
 
                     state_message = Box({
                         'Availability': attrs.State.lower() if 'State' in attrs else 'offline',
-                        'State': LockState(attrs.Locking_Mode).name.title(),
+                        'State': (
+                            "Keep In" if attrs.Locking_Mode == LockState.KEEPIN else # Make prettier on frontend
+                            "Keep Out" if attrs.Locking_Mode == LockState.KEEPOUT else
+                            LockState(attrs.Locking_Mode).name.title()
+                        ),
                         'Battery': str(attrs.Battery),
-                        'KeepIn': 'ON' if attrs.Locking_Mode in [1, 3] else 'OFF',
-                        'KeepOut': 'ON' if attrs.Locking_Mode in [2, 3] else 'OFF',
+                        'KeepIn': 'ON' if attrs.Locking_Mode in [LockState.KEEPIN, LockState.LOCKED] else 'OFF',
+                        'KeepOut': 'ON' if attrs.Locking_Mode in [LockState.KEEPOUT, LockState.LOCKED] else 'OFF',
                         'Curfew': 'ON' if curfew else 'OFF',
                         'Curfews': str(attrs.Curfews)
                     })
-                    if 'Custom_Modes' in attrs:  # Add custom mode
+                    if 'Custom_Modes' in attrs:
+                        try:
+                            custom_modes_str = attrs.Custom_Modes
+                            custom_modes = ast.literal_eval(custom_modes_str)
+                            log.debug(f"Parsed Custom Modes: {custom_modes}")
+                        except Exception as e:
+                            log.error(f"Error parsing Custom_Modes: {e}")
+                            custom_modes = []
                         state_message.merge_update({"CustomMode": attrs.Custom_Modes})
                     mqtt_messages.merge_update({PH_HA_T + devid + '/state': state_message.to_json()})
 
-                if attrs.Product_Id == 4:  # Feeder
+                if attrs.Product_Id == EntityType.Feeder:
                     state_message = Box({
                         'Availability': attrs.State.lower() if 'State' in attrs else 'offline',
                         'State': attrs.Lid_State.title() if 'Lid_State' in attrs else 'Closed',
@@ -937,7 +1036,7 @@ def ha_update_state(pethubconfig, *devicepet):
                         })
                     mqtt_messages.merge_update({PH_HA_T + devid + '/state': state_message.to_json()})
 
-                if attrs.Product_Id == 8:  # Poseidon
+                if attrs.Product_Id == EntityType.Poseidon:  # Poseidon
                     state_message = Box({
                         'Availability': attrs.State.lower() if 'State' in attrs else 'offline',
                         'State': attrs.State.title() if 'State' in attrs else 'Offline',
@@ -1064,27 +1163,35 @@ def parse_mqtt_message(pethubconfig, mqtt_topic, mqtt_message):
 
         # Pet Door or Cat Flap
         if (pid in [3, 6] and op in ['KeepIn', 'KeepOut']) or (pid == 3 and op == 'Curfew'):
-            if pid == 3 and op == 'Curfew':
-                nlm = 4
+            # Pet door specific curfew operation
+            if (pid == EntityType.PetDoor and op == 'Curfew' and mqtt_message == "ON"):
+                nlm = LockState.CURFEW
                 # Set Locking Mode
                 result.append(generatemessage(pethubconfig, hub, pid, 'CURFEWS', mac=mac,
                                               suboperation=dev['Curfews']))
-                # print(result.to_json())
             # Going to Lock State 3 - Lock both ways
-            elif (op == "KeepIn" and mqtt_message == "ON" and clm == 2) \
-                    or (op == "KeepOut" and mqtt_message == "ON" and clm == 1):
-                nlm = 3
+            elif (
+                (clm == LockState.KEEPOUT and op == "KeepIn" and mqtt_message == "ON") or # Currently in KeepOut. Turning KeepIn on too will be full lock.
+                (clm == LockState.KEEPIN and op == "KeepOut" and mqtt_message == "ON")    # Currently in KeepIn. Turning KeepOut on too will be full lock.
+            ):
+                nlm = LockState.LOCKED
             # Going to Lock State 2 - Keep pets out
-            elif (op == "KeepIn" and mqtt_message == "OFF" and clm == 3) \
-                    or (op == "KeepOut" and mqtt_message == "ON" and clm == 0):
-                nlm = 2
+            elif (
+                (clm == LockState.LOCKED and op == "KeepIn" and mqtt_message == "OFF") or   # Currently in full lock. Removing KeepIn will be KeepOut.
+                (clm == LockState.UNLOCKED and op == "KeepOut" and mqtt_message == "ON") or # Currently in unlocked. Turning KeepOut on will be KeepOut.
+                (clm == LockState.CURFEW and op == "KeepOut" and mqtt_message == "ON")      # Currently in curfew. Turning KeepOut on will override Curfew and result in KeepOut.
+            ):
+                nlm = LockState.KEEPOUT
             # Going to Lock State 1 - Keep pets in
-            elif (op == "KeepIn" and mqtt_message == "ON" and clm == 0) \
-                    or (op == "KeepOut" and mqtt_message == "OFF" and clm == 3):
-                nlm = 1
+            elif (
+                (clm == LockState.UNLOCKED and op == "KeepIn" and mqtt_message == "ON") or # Currently in unlocked. Turning KeepIn on will be KeepIn.
+                (clm == LockState.LOCKED and op == "KeepOut" and mqtt_message == "OFF") or # Currently in full lock. Removing KeepOut will be KeepIn.
+                (clm == LockState.CURFEW and op == "KeepIn" and mqtt_message == "ON")      # Currently in curfew. Turning KeepIn on will override Curfew and result in KeepIn.
+            ):
+                nlm = LockState.KEEPIN
             # Going to Lock State 0 - Unlocked
             else:
-                nlm = 0
+                nlm = LockState.UNLOCKED
 
             log.info("ToHub: Moving from current lock mode %s to lock mode %s",
                      LockState(clm).name, LockState(nlm).name)
@@ -1242,7 +1349,7 @@ def build_firmware(xor_key, serial_number):
     firmware = f'{serial_number}-{FIRMWAREVERSION}-00.bin'
     if not os.path.isfile(firmware):
         log.info('Firmware: Building version %s firmware', str(FIRMWAREVERSION))
-        package_dir = pkg_resources.resource_filename('pethublocal', "firmware")
+        package_dir = files("pethublocal") / "firmware"
         # Find the number of records / pages based on FIRMWAREVERSION
         with open(f'{package_dir}/Firmware-{FIRMWAREVERSION}-00.bin', 'rb') as f:
             headersplit = f.read(36).decode("utf-8").split()
